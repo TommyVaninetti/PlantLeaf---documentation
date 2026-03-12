@@ -1,5 +1,6 @@
 # ⚡ PlantLeaf ESEB — Electric Signal Elaboration Board
 ![Version](https://img.shields.io/badge/version-1.0-blue.svg)
+
 The **Electric Signal Elaboration Board (ESEB)** is a custom analog front-end designed to **acquire, amplify, and condition extremely small bioelectric signals in plants** before digital acquisition.
 
 Plant electrophysiological signals (such as **action potentials** and **variation potentials**) typically have amplitudes in the **microvolt–millivolt range** and occur at **very low frequencies**. Because of this, direct acquisition with a microcontroller is not possible without dedicated analog signal conditioning.
