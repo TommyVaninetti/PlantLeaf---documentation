@@ -49,7 +49,7 @@ Analyze saved `.paudio` recordings with frame-by-frame precision, reconstruct ti
 **Default Display**:
 - **X-axis**: Frequency (20-80 kHz)
 - **Y-axis**: Magnitude (Volts, linear scale)
-- **Curve Color**: Cyan (raw data)
+- **Curve Color**: changes based on the theme selected
 - **Current Frame**: Indicated by slider position
 
 **Controls**:
@@ -70,34 +70,32 @@ Analyze saved `.paudio` recordings with frame-by-frame precision, reconstruct ti
 
 ### 2. Microphone Normalization
 
-**Purpose**: Correct for non-flat frequency response of SPU0410LR5H-QB microphone
+**Purpose**: Correct for non-flat frequency response of SPU0410LR5H-QB microphone on both FFT and iFFT window
 
 **Activation**:
 - **Menu**: Analysis → Normalize FFT Window
-- **Keyboard**: `Cmd+N` (macOS) / `Ctrl+N` (Windows)
 
 **Effect**:
-- **Orange Curve**: Normalized spectrum overlays cyan (raw) curve
+- **Red Curve**: Normalized spectrum overlays raw curve
 - **Legend**: Shows both curves with labels
-  - "Raw" (cyan)
-  - "Normalized 50%" (orange)
+  - "Raw"
+  - "Normalized 50%" (red)
 
 **Technical Details**:
-See [MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md](MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md) for:
+See [MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md](normalization_feature/MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md) for:
 - Datasheet interpolation method
 - Error analysis (±2.9 dB)
 - Scientific validation
 
 **Toggle Off**:
 - Menu: Analysis → Show Raw FFT Only
-- Keyboard: `Cmd+N` again (toggle)
 
 ### 3. Plot Interaction
 
 **PyQtGraph native controls**:
 - **Zoom**: Mouse wheel or right-click drag
 - **Pan**: Left-click drag
-- **Auto-range**: Press 'A' or right-click → View All
+- **Auto-range**: Press 'A'
 
 ---
 
@@ -135,7 +133,7 @@ Reconstruct time-domain signal from FFT magnitude + phase data to achieve **sub-
 - **Without Window**: ~9% overshoot, decaying oscillations
 
 **Technical Explanation**:
-See [FFT_PHASE_TECHNICAL_SPECIFICATION.md](FFT_PHASE_TECHNICAL_SPECIFICATION.md), Section 7
+See [FFT_PHASE_TECHNICAL_SPECIFICATION.md](FFT_and_acquisition_specifications/FFT_PHASE_TECHNICAL_SPECIFICATION.md), Section 7
 
 ### 5. Normalization in iFFT
 
@@ -143,10 +141,6 @@ See [FFT_PHASE_TECHNICAL_SPECIFICATION.md](FFT_PHASE_TECHNICAL_SPECIFICATION.md)
 
 **Activation**: Click **"Apply 50% Normalization"** button
 
-**Effect**:
-- **Orange (solid)**: Normalized iFFT waveform
-- **Cyan (dashed)**: Raw iFFT waveform
-- **Both visible**: Easy comparison
 
 **Toggle Back**: Click **"Show Raw iFFT"** button
 
@@ -217,6 +211,10 @@ Candidate frames must pass **all three criteria**:
 
 #### Stage 4: Deduplication
 - Merges detections that are too close in time to be separate events
+
+**Check the detailed documentation to have a deeper understanding** [CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md](Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md)
+
+NOTE THAT THE ALGOROTHM IS STILL IN DEVELOPMENT
 
 ### 3. Run Detection
 
@@ -678,10 +676,10 @@ Notes: Watered at t=600s
 
 ## References
 
-1. **FFT Phase Technical Specification**: [FFT_PHASE_TECHNICAL_SPECIFICATION.md](FFT_PHASE_TECHNICAL_SPECIFICATION.md)
-2. **Microphone Normalization Report**: [MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md](MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md)
+1. **FFT Phase Technical Specification**: [FFT_PHASE_TECHNICAL_SPECIFICATION.md](FFT_and_acquisition_specifications/FFT_PHASE_TECHNICAL_SPECIFICATION.md)
+2. **Microphone Normalization Report**: [MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md](normalization_feature/MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md)
 3. **Click Detection Algorithm**: [CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md](CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md)
-4. **User Guide (Normalization)**: [NORMALIZATION_USER_GUIDE.md](NORMALIZATION_USER_GUIDE.md)
+4. **User Guide (Normalization)**: [NORMALIZATION_USER_GUIDE.md](normalization_feature/NORMALIZATION_USER_GUIDE.md)
 
 ---
 

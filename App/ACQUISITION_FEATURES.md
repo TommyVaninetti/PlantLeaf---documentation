@@ -5,7 +5,7 @@
 PlantLeaf supports two distinct acquisition modes for plant bioacoustics and electrophysiology research:
 
 1. **Audio Mode**: Ultrasonic click detection (20-80 kHz)
-2. **Voltage Mode**: Action potential monitoring (0-500 Hz)
+2. **Voltage Mode**: Action potential monitoring (50Hz - 1kHz)
 
 Both modes provide real-time visualization, automated detection, and long-duration recording capabilities.
 
@@ -35,7 +35,6 @@ Capture and analyze ultrasonic sounds emitted by plants under stress conditions 
 | Frequency Resolution | 390.625 Hz/bin | fs / FFT_size |
 | Phase Quantization | 8-bit signed | ±0.71° error |
 | Data Rate | 2.4 Mbps | 770 bytes/frame × 390 FPS |
-| Dynamic Range | 60 dB | Microphone specification |
 
 ---
 
@@ -51,14 +50,14 @@ Capture and analyze ultrasonic sounds emitted by plants under stress conditions 
 
 ### 2. Configure Serial Port
 
-**Action**: Click **Serial Port** icon (toolbar) or press `Cmd+P` (macOS) / `Ctrl+P` (Windows)
+**Action**: Click **Serial Port** icon (toolbar)
 
 **Dialog Options**:
 - **Port List**: Automatically detects available USB CDC devices
 - **Baud Rate**: 115200 (nominal, actual USB CDC speed is 12 Mbps)
 - **Timeout**: 1 second
 
-**Typical Port Names**:
+**Typical Port Names (without driver installed)**:
 - macOS: `/dev/tty.usbmodem123456`
 - Windows: `COM3`, `COM4`, etc.
 - Linux: `/dev/ttyACM0`
@@ -84,7 +83,6 @@ Capture and analyze ultrasonic sounds emitted by plants under stress conditions 
 - **Timestamp**: Elapsed time since start (MM:SS.mmm)
 - **Peak Frequency**: Frequency bin with maximum amplitude
 - **Peak Magnitude**: Maximum value in current frame
-- **Click Count**: Number of detected clicks (based on threshold)
 
 ### 5. Monitor Click Events
 
@@ -152,7 +150,6 @@ Monitor slow electrical signals in plants (action potentials, variation potentia
 | Microcontroller | STM32F411CEU6 | USB CDC, same as audio mode |
 | ADC Resolution | 12-bit | 0.8 mV quantization step |
 | Voltage Range | 0 – 3.3 V | ±1.65 V with DC offset removal |
-| Bandwidth | DC – 500 Hz | Low-pass filtered |
 | Data Rate | up to 4 kB/s | 4 bytes/sample × sampling rate |
 
 ---
@@ -193,7 +190,6 @@ Monitor slow electrical signals in plants (action potentials, variation potentia
 - **Buffer**: Last 60,000 samples kept in memory for the rolling plot view
 
 #### Rolling Window
-- **Duration**: Last ~2 minutes visible at 500 Hz (configurable via time window toggle)
 - **Auto-Scroll**: New data appears on right, old data scrolls left
 
 ### 5. Save Data
@@ -220,7 +216,7 @@ Monitor slow electrical signals in plants (action potentials, variation potentia
 **Solutions**:
 1. Check physical connections
 2. Verify device power LED is on
-3. Install STM32 USB CDC driver:
+3. Install STM32 USB CDC driver, but note that it's not required nor with macOS/Linux nor Windows:
    - Windows: [ST VCP Driver](https://www.st.com/en/development-tools/stsw-stm32102.html)
    - macOS/Linux: Built-in kernel driver (no installation needed)
 
@@ -324,7 +320,7 @@ sudo usermod -aG dialout $USER
 
 ### Audio Mode Benchmarks
 
-**Test System**: MacBook Pro M1, 16 GB RAM, macOS 13
+**Test System**: MacBook Pro M1, 16 GB RAM, macOS 13 ; Custom Thinkpad
 
 | Metric | Value |
 |--------|-------|

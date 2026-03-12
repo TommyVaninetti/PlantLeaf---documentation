@@ -1,8 +1,7 @@
 # 🌿 PlantLeaf Desktop Application
 
-[![Version](https://img.shields.io/badge/version-1.0.0--beta-blue.svg)](https://github.com/TommyVaninetti/PlantLeaf-Desktop-App)
+[![Version](https://img.shields.io/badge/version-1.0.0--beta-blue.svg)]
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-Custom-green.svg)](LICENSE.rtf)
 [![PySide6](https://img.shields.io/badge/PySide6-6.9.0-green.svg)](https://doc.qt.io/qtforpython/)
 
 **PlantLeaf** is a powerful desktop application specifically designed for **plant bioacoustics and bioelectric research**, enabling real-time acquisition and analysis of ultrasonic click events and voltage signals (action potentials) in plants. Developed for the **FAST i Giovani e le Scienze 2026** competition.
@@ -22,7 +21,7 @@ PlantLeaf bridges the gap between rigorous scientific analysis and creative expl
 ### 🔬 Scientific Capabilities
 
 - **Frequency Range**: 20-80 kHz (ultrasonic band optimized for SPU0410LR5H-QB microphone)
-- **Sampling Rate**: 200 kHz (Audio) / 1-10 kHz (Voltage)
+- **Sampling Rate**: 200 kHz (Audio) / 50Hz-1kHz (Voltage)
 - **FFT Resolution**: 512 samples, 390.625 Hz/bin
 - **Phase Preservation**: 8-bit quantized phase data for iFFT reconstruction
 - **Temporal Resolution**: 2.56 ms frame duration, 5 μs sub-frame localization
@@ -137,33 +136,31 @@ V(t) = A_exp · exp(-(t-t_peak)/τ) + Vb    for t ≥ t_peak   [repolarization]
 
 ### Firmware
 - **STM32 HAL**: ARM Cortex-M4 microcontroller
-- **CMSIS-DSP**: Hardware-accelerated FFT (`arm_rfft_fast_f32`)
+- **CMSIS-DSP**: Hardware-accelerated FFT (`arm_rfft_fast`)
 - **USB CDC**: Virtual COM port for data streaming
 
-📖 **Detailed library rationale**: See [LIBRARIES.md](app/LIBRARIES.md)
+📖 **Detailed library rationale**: See [LIBRARIES.md](App/LIBRARIES.md)
 
 ---
 
 ## 📚 Documentation
 
-**📖 [Complete Documentation Index](app/DOCUMENTATION_INDEX.md)** - Start here for organized access to all docs
-
 ### User Guides
-- **[NORMALIZATION_USER_GUIDE.md](app/NORMALIZATION_USER_GUIDE.md)**: How to use the microphone normalization feature
-- **[ACQUISITION_FEATURES.md](app/ACQUISITION_FEATURES.md)**: Complete guide to real-time acquisition modes
-- **[ANALYSIS_FEATURES.md](app/ANALYSIS_FEATURES.md)**: Advanced analysis tools and workflows
+- **[NORMALIZATION_USER_GUIDE.md](App/NORMALIZATION_USER_GUIDE.md)**: How to use the microphone normalization feature
+- **[ACQUISITION_FEATURES.md](App/ACQUISITION_FEATURES.md)**: Complete guide to real-time acquisition modes
+- **[ANALYSIS_FEATURES.md](App/ANALYSIS_FEATURES.md)**: Advanced analysis tools and workflows
 
 ### Technical Specifications
-- **[FFT_PHASE_TECHNICAL_SPECIFICATION.md](app/FFT_PHASE_TECHNICAL_SPECIFICATION.md)**: Mathematical foundation of FFT/iFFT processing
-- **[MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md](app/MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md)**: Error analysis and validation (±2.9 dB accuracy)
-- **[CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md](app/CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md)**: Detection algorithm theory
+- **[FFT_PHASE_TECHNICAL_SPECIFICATION.md](App/FFT_and_acquisition_specifications/FFT_PHASE_TECHNICAL_SPECIFICATION.md)**: Mathematical foundation of FFT/iFFT processing
+- **[MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md](App/normalization_feature/MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md)**: Error analysis and validation (±2.9 dB accuracy)
+- **[CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md](App/Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md)**: Detection algorithm theory
 
 ### Architecture
-- **[LIBRARIES.md](app/LIBRARIES.md)**: Justification for technology choices
+- **[LIBRARIES.md](App/LIBRARIES.md)**: Justification for technology choices
 
 ---
 
-## 🔬 Scientific Validation
+## 🔬 Scientific Validation for Acoustic Signals
 
 ### Published Research Context
 This tool was developed following methodologies from:
@@ -197,13 +194,11 @@ NOT IMPLEMENTED YET
 ### Open-Source Components
 This application uses the following open-source libraries:
 - **Python**: PSF License
-- **PySide6**: LGPL v3 (see [LGPL Compliance Notice](README.txt))
+- **PySide6**: LGPL v3 
 - **PyQtGraph**: MIT License
 - **PySerial**: BSD License
 - **NumPy/SciPy**: BSD License
 - **PyInstaller**: GPL (distribution exceptions apply)
-
-Complete license texts: [licenses.txt](licenses.txt)
 
 ### Icons
 **Uicons** by [Flaticon](https://www.flaticon.com/uicons) - Open-source license
@@ -223,7 +218,7 @@ Complete license texts: [licenses.txt](licenses.txt)
 ## 🏆 Competitions & Recognition
 
 - **FAST i Giovani e le Scienze 2026** - Italian Finals Qualifier
-- Target: European Union Contest for Young Scientists (EUCYS)
+- Target: European Union Contest for Young Scientists (EUCYS) and Regeneron ISEF
 
 ---
 
@@ -231,7 +226,8 @@ Complete license texts: [licenses.txt](licenses.txt)
 
 This is an academic research project developed for scientific competitions.
 
-For questions or collaboration inquiries, please open an issue or contact the maintainer.
+For questions or collaboration inquiries, please open an issue or contact the maintainer. 
+We are more than happy to collaborate
 
 ---
 
@@ -239,20 +235,6 @@ For questions or collaboration inquiries, please open an issue or contact the ma
 
 - **Official Website**: www.plantleaf.it
 - **Research Paper**: -
-
----
-
-## 📊 Technical Highlights
-
-| Feature | Specification |
-|---------|--------------|
-| Sampling Rate | 200 kHz (Audio) / 1-10 kHz (Voltage) |
-| FFT Size | 512 samples (radix-2 Cooley-Tukey) |
-| Frequency Range | 20-80 kHz (ultrasonic) |
-| Phase Quantization | 8-bit signed (-127 to +127) |
-| Data Throughput | 2.4 Mbps (USB CDC) |
-| File Format | Custom binary (`.paudio` / `.pvoltage`) |
-| Platform Support | Windows, macOS, Linux (Python-based) |
 
 ---
 

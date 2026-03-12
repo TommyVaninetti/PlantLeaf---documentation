@@ -245,10 +245,9 @@ def normalize_fft_50_percent(fft_magnitude, frequency_axis):
 ### 5.3 User Interface
 
 **Display Elements**:
-- ✅ **Overlay curves**: Raw (blue) + Normalized (orange)
+- ✅ **Overlay curves**
 - ✅ **Legend**: Clear labeling with "50% Normalized" tag
 - ✅ **Toggle button**: Show/hide normalized curve
-- ✅ **Tooltip**: Shows correction gain at cursor position
 
 **User Warnings**:
 ```
@@ -360,13 +359,6 @@ The implemented **50% conservative normalization** provides:
 3. **Use raw data for amplitude thresholding**
 4. **Declare limitations** in methods section
 5. **Consider individual calibration** for high-precision studies
-
-### 9.3 Code Availability
-
-Implementation: `replay_window_audio.py::normalize_fft_window()`  
-License: [Project License]  
-Repository: [GitHub URL]  
-Contact: tommy.vaninetti@[domain]
 
 ---
 
