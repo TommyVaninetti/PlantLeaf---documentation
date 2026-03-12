@@ -1,6 +1,6 @@
 # 🌿 PlantLeaf Desktop Application
 
-[![Version](https://img.shields.io/badge/version-1.0.0--beta-blue.svg)]
+![Version](https://img.shields.io/badge/version-1.0.0--beta-blue.svg)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/PySide6-6.9.0-green.svg)](https://doc.qt.io/qtforpython/)
 
