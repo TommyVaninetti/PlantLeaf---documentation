@@ -1,4 +1,4 @@
-# ⚡ ESEB — Electric Signal Elaboration Board
+# ⚡ PlantLeaf ESEB — Electric Signal Elaboration Board
 
 The **Electric Signal Elaboration Board (ESEB)** is a custom analog front-end designed to **acquire, amplify, and condition extremely small bioelectric signals in plants** before digital acquisition.
 
