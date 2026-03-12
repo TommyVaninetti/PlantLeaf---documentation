@@ -34,7 +34,8 @@ PlantLeaf bridges the gap between rigorous scientific analysis and creative expl
 This repository focuses on:
 - **software and firmware** developed by **Tommaso Vaninetti**
 - **hardware** developed by **Abdoellah El Makkaoui**
-- and wants to provide a deep and open understanding of the process
+
+and wants to provide a deep and open understanding of the process
 
 ## 🚀 Key Features
 
