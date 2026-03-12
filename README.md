@@ -208,7 +208,7 @@ This application uses the following open-source libraries:
 ## 👥 Team
 
 **Software & Firmware**: Tommaso Vaninetti  
-**Hardware Design**: Abdoellah El Makkoui
+**Hardware Design**: Abdoellah El Makkaoui
 **Web/Database**: Frida Tirari
 
 **Contact**: tommasovaninetti8@gmail.com
