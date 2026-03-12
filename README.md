@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/PySide6-6.9.0-green.svg)](https://doc.qt.io/qtforpython/)
 
-**PlantLeaf** is a powerful desktop application specifically designed for **plant bioacoustics and bioelectric research**, enabling real-time acquisition and analysis of ultrasonic click events and voltage signals (action potentials) in plants. Developed for the **FAST i Giovani e le Scienze 2026** competition.
+**PlantLeaf** is a powerful desktop application specifically designed for **plant bioacoustics and bioelectric research**, enabling real-time acquisition and analysis of ultrasonic click events and voltage signals (action potentials) in plants.
 
 ---
 
@@ -211,7 +211,7 @@ This application uses the following open-source libraries:
 **Hardware Design**: Abdoellah El Makkaoui
 **Web/Database**: Frida Tirari
 
-**Contact**: tommasovaninetti8@gmail.com
+**Contact**: tommasovaninetti8@gmail.com, abdoellah.elmakkaoui@gmail.com
 
 ---
 
