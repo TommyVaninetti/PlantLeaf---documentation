@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-Custom-green.svg)](LICENSE.rtf)
 [![PySide6](https://img.shields.io/badge/PySide6-6.9.0-green.svg)](https://doc.qt.io/qtforpython/)
 
-**PlantLeaf** is a powerful desktop application specifically designed for **plant bioacoustics research**, enabling real-time acquisition and analysis of ultrasonic click events and voltage signals (action potentials) in plants. Developed for the **FAST i Giovani e le Scienze 2026** competition.
+**PlantLeaf** is a powerful desktop application specifically designed for **plant bioacoustics and bioelectric research**, enabling real-time acquisition and analysis of ultrasonic click events and voltage signals (action potentials) in plants. Developed for the **FAST i Giovani e le Scienze 2026** competition.
 
 ---
 
@@ -17,6 +17,7 @@ PlantLeaf bridges the gap between rigorous scientific analysis and creative expl
 - **Action Potential Monitoring**: High-precision voltage acquisition for detecting plant electrical signals
 - **Real-Time Acquisition**: Live monitoring with FFT spectrum visualization (390.625 FPS) for audio and up to 1k sampling rate for bioelectric signals
 - **Advanced Analysis Tools**: Phase-preserving FFT, inverse FFT reconstruction, click detection algorithms, microphone normalization, automatic fitting for action potential
+- **Cheap Instrumentation**: Custom hardware designed to be both cheap and scientifically rigorous 
 
 ### 🔬 Scientific Capabilities
 
@@ -31,14 +32,17 @@ PlantLeaf bridges the gap between rigorous scientific analysis and creative expl
 
 ## 📂 Repository Structure
 
-This repository focuses on **software and firmware** developed by **Tommaso Vaninetti** and wants to provide a deep and open understanding of the process
+This repository focuses on:
+- **software and firmware** developed by **Tommaso Vaninetti**
+- **hardware** developed bu **Abdoellah El Makkaoui**
+and wants to provide a deep and open understanding of the process
 
 ## 🚀 Key Features
 
 ### 📡 Real-Time Acquisition
 
 #### Audio Mode (Ultrasonic Clicks)
-- **512-sample FFT** at 390 FPS for real-time spectral analysis
+- **512-sample FFT** at 390 FFTs per second for real-time spectral analysis
 - **Live spectrum visualization** (20-80 kHz bandpass)
 - **Phase data preservation** for inverse FFT reconstruction
 - **Automatic click detection** with adjustable thresholds
@@ -52,6 +56,8 @@ This repository focuses on **software and firmware** developed by **Tommaso Vani
 - **CSV export** for external analysis
 
 ### 🔬 Advanced Analysis Tools
+
+**ULTRASONIC CLICKS**
 
 #### FFT Spectrum Analysis
 - **Magnitude + Phase** complex spectrum display
@@ -71,7 +77,9 @@ This repository focuses on **software and firmware** developed by **Tommaso Vani
 - **False-positive suppression** using spectral coherence analysis
 - **Batch processing** for entire recordings
 
-### 📈 Mathematical Analysis & Automatic Fitting for Voltage Signals
+**BIOELECTRIC REACTION**
+
+### Mathematical Analysis & Automatic Fitting for Voltage Signals
 
 A dedicated analysis module allows quantitative characterization of plant electrical signals:
 
@@ -132,26 +140,26 @@ V(t) = A_exp · exp(-(t-t_peak)/τ) + Vb    for t ≥ t_peak   [repolarization]
 - **CMSIS-DSP**: Hardware-accelerated FFT (`arm_rfft_fast_f32`)
 - **USB CDC**: Virtual COM port for data streaming
 
-📖 **Detailed library rationale**: See [LIBRARIES.md](docs/LIBRARIES.md)
+📖 **Detailed library rationale**: See [LIBRARIES.md](app/LIBRARIES.md)
 
 ---
 
 ## 📚 Documentation
 
-**📖 [Complete Documentation Index](docs/DOCUMENTATION_INDEX.md)** - Start here for organized access to all docs
+**📖 [Complete Documentation Index](app/DOCUMENTATION_INDEX.md)** - Start here for organized access to all docs
 
 ### User Guides
-- **[NORMALIZATION_USER_GUIDE.md](docs/NORMALIZATION_USER_GUIDE.md)**: How to use the microphone normalization feature
-- **[ACQUISITION_FEATURES.md](docs/ACQUISITION_FEATURES.md)**: Complete guide to real-time acquisition modes
-- **[ANALYSIS_FEATURES.md](docs/ANALYSIS_FEATURES.md)**: Advanced analysis tools and workflows
+- **[NORMALIZATION_USER_GUIDE.md](app/NORMALIZATION_USER_GUIDE.md)**: How to use the microphone normalization feature
+- **[ACQUISITION_FEATURES.md](app/ACQUISITION_FEATURES.md)**: Complete guide to real-time acquisition modes
+- **[ANALYSIS_FEATURES.md](app/ANALYSIS_FEATURES.md)**: Advanced analysis tools and workflows
 
 ### Technical Specifications
-- **[FFT_PHASE_TECHNICAL_SPECIFICATION.md](docs/FFT_PHASE_TECHNICAL_SPECIFICATION.md)**: Mathematical foundation of FFT/iFFT processing
-- **[MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md](docs/MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md)**: Error analysis and validation (±2.9 dB accuracy)
-- **[CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md](docs/CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md)**: Detection algorithm theory
+- **[FFT_PHASE_TECHNICAL_SPECIFICATION.md](app/FFT_PHASE_TECHNICAL_SPECIFICATION.md)**: Mathematical foundation of FFT/iFFT processing
+- **[MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md](app/MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md)**: Error analysis and validation (±2.9 dB accuracy)
+- **[CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md](app/CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md)**: Detection algorithm theory
 
 ### Architecture
-- **[LIBRARIES.md](docs/LIBRARIES.md)**: Justification for technology choices
+- **[LIBRARIES.md](app/LIBRARIES.md)**: Justification for technology choices
 
 ---
 
@@ -184,7 +192,7 @@ This tool was developed following methodologies from:
 ## 📄 License & Compliance
 
 ### Application License
-See [LICENSE.rtf](LICENSE.rtf) for full terms. (NOT IMPLEMENTED YET)
+NOT IMPLEMENTED YET
 
 ### Open-Source Components
 This application uses the following open-source libraries:
