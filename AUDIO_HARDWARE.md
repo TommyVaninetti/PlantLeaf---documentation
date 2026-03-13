@@ -32,14 +32,14 @@ Typical signal characteristics include:
 
 **Sound pressure level**
 
-- Approximately 6**0–70 dB SPL at 10 cm**
+- Approximately **60–70 dB SPL at 10 cm**
 - Can still be detected at distances of **3–5 meters** under controlled conditions
 
 **Event rate**
 
 - Healthy plants produce **very few clicks**
 - Plants under stress can produce **tens of acoustic events per hour**
-These emissions appear as **isolated ultrasonic impulses** rather than continuous signals.
+- These emissions appear as **isolated ultrasonic impulses** rather than continuous signals.
  
 # 🌿 Biological Origin of the Signals
 The currently accepted explanation links these emissions to **xylem cavitation.**
