@@ -176,3 +176,9 @@ Abdoellah El Makkaoui
 Tommaso Vaninetti  
 
 Developed as part of the **PlantLeaf research project**.
+
+---
+
+**Last Updated**: March 13, 2026  
+**ESEB Version**: 1.0  
+![status](https://img.shields.io/badge/status-Active-green.svg)
