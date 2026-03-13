@@ -18,17 +18,25 @@ These signals are believed to originate from **cavitation events in the xylem,**
 # 🔬 Acoustic Characteristics of Plant Emissions
 Experimental measurements from recent studies have identified several key properties of plant ultrasonic emissions.
 Typical signal characteristics include:
+
 **Frequency range**
+
 - Typically between **20 kHz and 100 kHz**
 - Most observed peaks occur between **40 kHz and 80 kHz**
 - Some species show dominant spectral peaks around **50–60 kHz**
+  
 **Click duration**
+
 - Extremely short impulsive events
 - Typical duration between **0.1 ms and 0.5 ms**
+
 **Sound pressure level**
+
 - Approximately 6**0–70 dB SPL at 10 cm**
 - Can still be detected at distances of **3–5 meters** under controlled conditions
+
 **Event rate**
+
 - Healthy plants produce **very few clicks**
 - Plants under stress can produce **tens of acoustic events per hour**
 These emissions appear as **isolated ultrasonic impulses** rather than continuous signals.
