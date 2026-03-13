@@ -155,6 +155,7 @@ V(t) = A_exp · exp(-(t-t_peak)/τ) + Vb    for t ≥ t_peak   [repolarization]
 - **[MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md](App/normalization_feature/MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md)**: Error analysis and validation (±2.9 dB accuracy)
 - **[CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md](App/Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md)**: Detection algorithm theory
 - **[VOLTAGE_HARDWARE.md](Hardware/VOLTAGE_HARDWARE.md)**: Detailed info about the ESEB board
+- **[AUDIO_HARDWARE.md](Hardware/AUDIO_HARDWARE.md)**: Detailed info about ASEB board
 
 ### Architecture
 - **[LIBRARIES.md](App/LIBRARIES.md)**: Justification for technology choices

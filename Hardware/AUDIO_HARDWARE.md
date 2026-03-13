@@ -56,12 +56,10 @@ One of the most cited recent studies was conducted by researchers at **Tel Aviv 
 Key findings from this research include:
 - Stressed plants emitted significantly more ultrasonic clicks than unstressed plants
 - The signals could be detected several meters away
-- Machine learning models were able to classify plant conditions from the acoustic data
 However, the study also highlights several limitations:
 - Only a **limited number of plant species** were tested
 - Experiments were conducted under **controlled laboratory conditions**
-- The biological origin and ecological role of the signals are **not yet fully understood**
-As a result, plant bioacoustics remains a **relatively unexplored research field.**
+As a result, plant bioacoustics remains a **relatively unexplored research field**, also due to the elevated cost of the instrumentation.
  
 # 🎯 Relevance for the PlantLeaf Project
 The existence of ultrasonic emissions from plants opens the possibility of **non-invasive plant monitoring systems.**
@@ -105,7 +103,7 @@ Typical characteristics:
 | Parameter | Typical Value |
 |-----------|---------------|
 | Sensor type | Analog MEMS microphone |
-| Frequency response | Up to ~100 kHz (ultrasonic capable) |
+| Frequency response | Up to ~80 kHz (ultrasonic capable) |
 | Output | Analog voltage |
 | Package | Surface-mount (SMD) |
 
