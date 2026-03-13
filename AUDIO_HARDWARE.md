@@ -199,3 +199,9 @@ Abdoellah El Makkaoui
 Tommaso Vaninetti  
 
 Developed as part of the **PlantLeaf research project**; the design of this board is still **WIP**.
+
+---
+
+**Last Updated**: March 13, 2026  
+**ASEB Version**: WIP  
+**Project Status**: 🟢 Active Development
