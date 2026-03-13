@@ -12,8 +12,60 @@ It is part of the **PlantLeaf experimental platform**, enabling the study and mo
 ---
 
 # 📡 Ultrasonic Emissions in Plants
-
-*(Section for theoretical background.)*
+Recent studies suggest that plants under stress conditions (such as drought or mechanical damage) may emit airborne ultrasonic acoustic signals. These emissions are typically referred to as **ultrasonic clicks** and consist of very short acoustic pulses in the ultrasonic frequency range.
+These signals are believed to originate from **cavitation events in the xylem,** where small air bubbles form and collapse during water transport inside the plant vascular system.
+ 
+# 🔬 Acoustic Characteristics of Plant Emissions
+Experimental measurements from recent studies have identified several key properties of plant ultrasonic emissions.
+Typical signal characteristics include:
+**Frequency range**
+•	Typically between **20 kHz and 100 kHz**
+•	Most observed peaks occur between **40 kHz and 80 kHz**
+•	Some species show dominant spectral peaks around **50–60 kHz**
+**Click duration**
+•	Extremely short impulsive events
+•	Typical duration between **0.1 ms and 0.5 ms**
+**Sound pressure level**
+•	Approximately 6**0–70 dB SPL at 10 cm**
+•	Can still be detected at distances of **3–5 meters** under controlled conditions
+**Event rate**
+•	Healthy plants produce **very few clicks**
+•	Plants under stress can produce **tens of acoustic events per hour**
+These emissions appear as **isolated ultrasonic impulses** rather than continuous signals.
+ 
+# 🌿 Biological Origin of the Signals
+The currently accepted explanation links these emissions to **xylem cavitation.**
+During water transport:
+•	Plants pull water upward through the **xylem vessels**
+•	Under stress conditions (especially drought), the tension inside the xylem increases
+•	This tension can cause **air bubbles to form and collapse**
+•	These microscopic events generate **mechanical vibrations**
+•	The vibrations propagate through the plant tissue and into the air as **ultrasonic acoustic clicks**
+While this mechanism is widely supported, the exact relationship between cavitation and airborne ultrasonic emissions is still under investigation.
+ 
+# 📊 Scientific Background
+One of the most cited recent studies was conducted by researchers at **Tel Aviv University,** who recorded ultrasonic emissions from plants such as tomato and tobacco.
+Key findings from this research include:
+•	Stressed plants emitted significantly more ultrasonic clicks than unstressed plants
+•	The signals could be detected several meters away
+•	Machine learning models were able to classify plant conditions from the acoustic data
+However, the study also highlights several limitations:
+•	Only a **limited number of plant species** were tested
+•	Experiments were conducted under **controlled laboratory conditions**
+•	The biological origin and ecological role of the signals are **not yet fully understood**
+As a result, plant bioacoustics remains a **relatively unexplored research field.**
+ 
+# 🎯 Relevance for the PlantLeaf Project
+The existence of ultrasonic emissions from plants opens the possibility of **non-invasive plant monitoring systems.**
+Potential applications include:
+•	Early detection of **plant water stress**
+•	Monitoring **plant health conditions**
+•	Developing **precision agriculture sensors**
+However, detecting these signals is technically challenging because:
+•	The signals are **very weak**
+•	They occur in the **ultrasonic frequency range**
+•	They are often masked by **environmental noise**
+For this reason, the PlantLeaf platform focuses on developing a **low-noise ultrasonic acquisition system** capable of capturing and analyzing these acoustic events.
 
 ---
 
