@@ -204,4 +204,4 @@ Developed as part of the **PlantLeaf research project**; the design of this boar
 
 **Last Updated**: March 13, 2026  
 **ASEB Version**: WIP  
-**Project Status**: 🟢 Active Development
+![status](https://img.shields.io/badge/status-Active-green.svg)
