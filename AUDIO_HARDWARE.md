@@ -1,5 +1,5 @@
 # 🔉 PlantLeaf ASEB — Audio Signal Elaboration Board
-![Version](https://img.shields.io/badge/version-N/A-red.svg)
+![Version](https://img.shields.io/badge/version-WIP-purple.svg)
 
 The **Audio Signal Elaboration Board (ASEB)** is a custom analog front-end designed to **detect, amplify, and condition ultrasonic acoustic emissions produced by plants** before digital acquisition.
 
