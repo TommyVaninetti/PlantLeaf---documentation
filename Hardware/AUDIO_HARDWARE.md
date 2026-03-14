@@ -59,6 +59,7 @@ Key findings from this research include:
 However, the study also highlights several limitations:
 - Only a **limited number of plant species** were tested
 - Experiments were conducted under **controlled laboratory conditions**
+
 As a result, plant bioacoustics remains a **relatively unexplored research field**, also due to the elevated cost of the instrumentation.
  
 # 🎯 Relevance for the PlantLeaf Project
@@ -71,6 +72,7 @@ However, detecting these signals is technically challenging because:
 - The signals are **very weak**
 - They occur in the **ultrasonic frequency range**
 - They are often masked by **environmental noise**
+
 For this reason, the PlantLeaf platform focuses on developing a **low-noise ultrasonic acquisition system** capable of capturing and analyzing these acoustic events.
 
 ---
