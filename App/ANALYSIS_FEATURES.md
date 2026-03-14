@@ -169,7 +169,7 @@ See [FFT_PHASE_TECHNICAL_SPECIFICATION.md](FFT_and_acquisition_specifications/FF
 
 ### 🎯 Purpose
 
-Automatically identify frames containing ultrasonic clicks based on a **4-stage pipeline** algorithm.
+Automatically identify frames containing ultrasonic clicks based on a **4-stage pipeline** algorithm (v4.0). The pipeline progressively filters the ~1.4 million frames of a one-hour recording down to a few dozen confirmed click events with high sensitivity and very low false-positive rate.
 
 ### 1. Open Click Detector Dialog
 
@@ -182,76 +182,117 @@ Automatically identify frames containing ultrasonic clicks based on a **4-stage 
 - Total frames
 - Mean energy μ (mV)
 - Std deviation σ (mV)
+- Estimated noise floor (µV, from offline estimation)
 
 ### 2. Detection Pipeline
 
-The algorithm runs 4 sequential stages:
+The algorithm runs 4 sequential stages. A frame must pass **every** stage to be confirmed as a click.
+
+```
+[Stage 1]  Energy threshold  →  discard silent frames  (E > μ + k·σ)
+[Stage 2]  SPR filter        →  discard tonal/narrowband noise  (SPR ≤ max_spr)
+[Stage 3]  Six-criterion validation  →  ALL SIX must pass
+[Stage 4]  Deduplication     →  merge consecutive frames, keep strongest
+```
 
 #### Stage 1: Energy Threshold
-- **Parameter**: Energy threshold (spinbox, units: mV)
+
+- **Parameter**: Energy threshold spinbox (units: mV)
 - **Default**: μ + 4σ (auto-calculated from the loaded file)
 - **Step size**: 1σ (spinbox step adapts to the file's noise floor)
 - **Logic**: Frames with mean FFT amplitude above threshold are **candidates**
+- **Typical reduction**: eliminates 98–99% of frames
 
-#### Stage 2: Spectral Ratio (descriptive)
-- **Computes**: R = E_low / E_high (energy ratio between frequency sub-bands)
-- **Purpose**: Descriptive feature only — saved per click, **not used as a pass/fail criterion**
-- **Optional**: "Apply 50% microphone correction" checkbox normalizes the FFT before computing R
+#### Stage 2: Spectral Peak Ratio (SPR) Filter
 
-#### Stage 3: Three-Criterion Validation
-Candidate frames must pass **all three criteria**:
+- **Formula**: `SPR = max(|X[k]|²) / mean(|X[k]|²)` computed over all 154 bins (20–80 kHz)
+- **Default threshold**: `max_spr = 20`
+- **Logic**: broadband clicks (energy spread across many bins) have low SPR; tonal interference (fans, EMI, sine tones) concentrates energy in 1–3 bins → high SPR → **rejected**
+- **Key property**: amplitude-invariant — depends only on spectral *shape*, not signal level
+- **Also computed (descriptive only)**: `R = E_low / E_high` (spectral balance between 20–40 kHz and 40–80 kHz sub-bands), saved per click but not used as a filter
 
-| Criterion | Parameter | Default | Description |
-|-----------|-----------|---------|-------------|
-| 1. SNR | Min. SNR spinbox | 5.0 | peak_amplitude / noise_rms > threshold |
-| 2. PRE_ratio | Max. PRE_ratio spinbox | 0.15 | E_pre / E_post < threshold (silence before click) |
-| 3. Decay | — | fixed | E_W1 > E_W4 (energy decreases across sub-windows: global decay) |
+#### Stage 3: Six-Criterion Validation (v4.0)
 
-**Noise estimation**: Before stage 1, an offline noise estimation scans the file to compute `noise_rms` from frames below the energy threshold (up to 500 samples).
+Candidate frames must pass **all six criteria**. These are evaluated on the iFFT-reconstructed, Gibbs-suppressed time-domain signal and its Hilbert envelope.
+
+| # | Criterion | Parameter | Default | Description |
+|---|-----------|-----------|---------|-------------|
+| C1 | **Peak iFFT amplitude** | Min. peak iFFT | 130 µV | Absolute peak of time-domain signal must clear minimum threshold |
+| C2 | **Silence before click** (pre_snr) | Max. pre_snr | 1.7 | `RMS(pre_window) / noise_rms` — confirms transient onset from silence |
+| C3 | **Global energy decay** | Min. E_W1/E_W4 ratio | 2.0 | First sub-window energy must be ≥ 2× last sub-window energy |
+| C4 | **Spike asymmetry** | Max. asym ratio | 2.5 | `rise_samples / fall_samples` — rejects short symmetric electrical spikes |
+| C5 | **Physical decay time** (τ) | τ range | [0.045, 1.3] ms | Exponential decay constant must match cavitation physics |
+| C6 | **Decay quality** (R²) | Min. R² | 0.45 | Log-linear fit of Hilbert envelope must confirm exponential decay |
+
+**Noise estimation**: Before Stage 1, an offline estimator scans up to 500 silent frames (seed = 42, reproducible) and computes `noise_rms` as the mean RMS of their iFFT signals. This value is used by C1 and C2.
 
 #### Stage 4: Deduplication
-- Merges detections that are too close in time to be separate events
 
-**Check the detailed documentation to have a deeper understanding** [CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md](Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md)
+- Groups detections with gap ≤ 4 consecutive frames (~10 ms)
+- Within each group, keeps the frame with the highest peak amplitude
+- Prevents the same physical click from being counted multiple times when it overlaps two consecutive frames
 
-NOTE THAT THE ALGOROTHM IS STILL IN DEVELOPMENT
+**📖 Full mathematical documentation**: [CLICK_DETECTION_ALGORITHM_v4.md](autoclick/CLICK_DETECTION_ALGORITHM_v4.md)
 
-### 3. Run Detection
+### 3. Configurable Parameters
+
+| Parameter | Default | Effect if increased | Effect if decreased |
+|-----------|---------|---------------------|---------------------|
+| Energy threshold (k·σ) | μ + 4σ | Fewer Stage 1 candidates, faster | More candidates, more false positives |
+| Max SPR | 20 | Accepts more tonal signals | Rejects more narrowband noise |
+| Min peak iFFT (C1) | 130 µV | Requires stronger clicks | Catches weaker clicks, more noise |
+| Max pre_snr (C2) | 1.7 | Tolerates more background noise pre-click | Requires stricter silence |
+| Min E_W1/E_W4 (C3) | 2.0 | Requires stronger decay gradient | Accepts slower-decaying events |
+| Max asymmetry (C4) | 2.5 | More tolerant of spike-like shapes | More aggressive spike rejection |
+| τ min / τ max (C5) | 0.045 / 1.3 ms | Wider physical window | Narrower physical window |
+| Min R² (C6) | 0.45 | Requires cleaner exponential decay | Accepts noisier decay shapes |
+
+### 4. Run Detection
 
 **Action**: Click **"▶ Run Detection"** button
 
 **Process**:
 1. Offline noise estimation from empty frames
-2. Stage 1 candidate selection
-3. Stage 2 spectral ratio computation (descriptive)
-4. Stage 3 three-criterion validation
+2. Stage 1 candidate selection (energy threshold)
+3. Stage 2 SPR broadband filter + R spectral ratio (descriptive)
+4. Stage 3 six-criterion validation (iFFT + Hilbert envelope)
 5. Stage 4 deduplication
 6. Results table populated
 
-### 4. Results Table
+### 5. Results Table
 
 **Columns**:
 | Column | Description |
 |--------|-------------|
 | Timestamp | Absolute time (s) |
-| Amplitude | Peak FFT amplitude (V) |
-| SNR | Signal-to-noise ratio (criterion 1) |
-| PRE_ratio | Pre/post energy ratio (criterion 2) |
-| E_W1/E_W4 | First vs. last sub-window energy ratio (criterion 3) |
-| Energy FFT | Total frame energy |
-| Ratio R | E_low / E_high spectral ratio (descriptive) |
-| R² (log) | R² of logarithmic decay fit (descriptive) |
-| τ (ms) | Decay time constant from envelope fit (descriptive) |
-| Classification | Validated click / Rejected |
-| Notes | Additional information |
+| Peak iFFT | Peak time-domain amplitude (µV) — C1 |
+| pre_snr | Silence-before-click ratio — C2 |
+| E_W1/E_W4 | Energy decay ratio across sub-windows — C3 |
+| Asymmetry | Rise/fall ratio — C4 |
+| τ (ms) | Exponential decay constant — C5 |
+| R² (log) | Quality of exponential fit — C6 |
+| SPR | Spectral Peak Ratio (Stage 2 filter value) |
+| Ratio R | E_low / E_high spectral balance (descriptive) |
+| Verdict | ✅ WOULD PASS SCAN / ❌ WOULD FAIL SCAN |
+| Notes | Failed criteria, near-end flag, etc. |
 
 **Navigation**: Double-click a row to jump to that frame in the main window.
 
-### 5. Export Results
+### 6. iFFT Window Integration
+
+When a detected click is selected and the iFFT window is open, the **"Analyze Decay"** button runs the full v4.0 validation on the current frame and shows:
+- All six criterion results (pass/fail with measured values)
+- Final verdict: **✅ WOULD PASS SCAN** or **❌ WOULD FAIL SCAN**
+- Descriptive features: τ, R², slope, sub-window energies
+
+### 7. Export Results
 
 **Action**: Click **"Export Results..."** button (enabled after detection)
 
-**Format**: CSV with all table columns
+**Format**: CSV with all table columns (one row per confirmed click)
+
+
+For more details about the algorithm developed, check **[CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md](Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM.md)**
 
 ---
 
@@ -678,11 +719,11 @@ Notes: Watered at t=600s
 
 1. **FFT Phase Technical Specification**: [FFT_PHASE_TECHNICAL_SPECIFICATION.md](FFT_and_acquisition_specifications/FFT_PHASE_TECHNICAL_SPECIFICATION.md)
 2. **Microphone Normalization Report**: [MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md](normalization_feature/MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md)
-3. **Click Detection Algorithm**: [CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md](CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md)
+3. **Click Detection Algorithm (v4.0)**: [CLICK_DETECTION_ALGORITHM_v4.md](autoclick/CLICK_DETECTION_ALGORITHM_v4.md)
 4. **User Guide (Normalization)**: [NORMALIZATION_USER_GUIDE.md](normalization_feature/NORMALIZATION_USER_GUIDE.md)
 
 ---
 
-**Last Updated**: March 11, 2026  
+**Last Updated**: March 14, 2026  
 **Author**: Tommaso Vaninetti  
-**Version**: 1.0
+**Version**: 2.0
