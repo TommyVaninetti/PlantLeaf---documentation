@@ -58,7 +58,7 @@ RECORDING  (N FFT frames, 20-80 kHz, 390 FPS)
      ▼
 [Stage 3]  Six-criterion temporal validation  →  ALL SIX must pass
      │      C1: peak_iFFT ≥ 130 µV        (absolute amplitude)
-     │      C2: pre_snr < 1.7             (silence before click)
+     │      C2: pre_snr < 1.8             (silence before click)
      │      C3: E_W1 / E_W4 > 2           (energy decay)
      │      C4: asymmetry ratio < 2.5     (spike rejection)
      │      C5: τ ∈ [0.045, 1.3] ms      (physical duration)
@@ -362,7 +362,7 @@ Note that this is distinct from Stage 1 (which operates on raw FFT energy before
 ### 7.2 Criterion 2 – Silence Before Click (pre_snr)
 
 ```
-C2:  pre_snr < pre_snr_max    (default pre_snr_max = 1.7)
+C2:  pre_snr < pre_snr_max    (default pre_snr_max = 1.8)
 
 pre_snr = RMS(pre_window) / noise_rms
 ```
