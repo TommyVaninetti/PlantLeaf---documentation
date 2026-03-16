@@ -96,6 +96,7 @@ f_nyq = fs / 2 = 200 kHz / 2 = 100 kHz
 
 | Parameter | Value | Rationale |
 |-----------|-------|-----------|
+| Sampling Frequency | 200k samples/s | > 2*80k (Nyquist) |
 | FFT Size (N) | 512 samples | Power-of-2 for radix-2 algorithm |
 | Window Duration | 2.56 ms | N/fs = 512/200000 |
 | Frame Rate | 390.625 FPS | fs/N = 200000/512 |
