@@ -17,14 +17,15 @@
 2. [The Big Picture – How the Algorithm Works](#2-the-big-picture)
 3. [System Setup and Signal Representation](#3-system-setup-and-signal-representation)
 4. [Signal Reconstruction: iFFT and Gibbs Suppression](#4-signal-reconstruction-ifft-and-gibbs-suppression)
-5. [Stage 1 – Energy Threshold](#5-stage-1--energy-threshold)
-6. [Stage 2 – Spectral Peak Ratio Filter](#6-stage-2--spectral-peak-ratio-filter)
+5. [Stage 1 – Energy Threshold + Group Filter](#5-stage-1--energy-threshold--group-filter)
+6. [Stage 2 – FFT Filters (Peak Amplitude + SPR)](#6-stage-2--fft-filters-peak-amplitude--spr)
 7. [Stage 3 – Six-Criterion Temporal Validation (v4.0)](#7-stage-3--six-criterion-temporal-validation-v40)
 8. [Stage 4 – Deduplication](#8-stage-4--deduplication)
 9. [Offline Noise Estimation](#9-offline-noise-estimation)
 10. [Descriptive Features (R², τ)](#10-descriptive-features-r²-τ)
 11. [Experimental Methodology and Calibration](#11-experimental-methodology-and-calibration)
-12. [References](#12-references)
+12. [Algorithm Version History](#12-algorithm-version-history)
+13. [References](#13-references)
 
 ---
 
@@ -49,11 +50,13 @@ RECORDING  (N FFT frames, 20-80 kHz, 390 FPS)
 [Pre-processing]  iFFT reconstruction + Gibbs suppression
      │
      ▼
-[Stage 1]  Energy threshold  →  discard silent frames
-     │      E_frame > μ + k·σ
+[Stage 1]  Energy threshold + group filter  →  discard silent frames
+     │      E_frame > μ + k·σ   (default k = 5)
+     │      Discard consecutive runs of > MAX_RUN = 4 frames  (sustained noise)
      ▼
-[Stage 2]  SPR broadband filter  →  discard tonal/narrowband noise
-     │      SPR = max(|X[k]|²) / mean(|X[k]|²)  ≤  max_spr
+[Stage 2]  FFT filters (normalized)  →  discard weak and tonal/narrowband frames
+     │      peak_norm > 0.85 mV      (minimum normalized FFT peak amplitude)
+     │      SPR = max(|X[k]|²) / mean(|X[k]|²)  ≤  max_spr   (broadband shape)
      ▼
 [Stage 3]  Six-criterion temporal validation  →  ALL SIX must pass
      │      C1: peak_iFFT ≥ 130 µV        (absolute amplitude)
@@ -74,8 +77,8 @@ DETECTED CLICK EVENTS  (timestamp, amplitude, τ, R², spectral features)
 | Stage | Frames remaining | Reduction |
 |-------|-----------------|-----------|
 | Input | 1,406,250 | — |
-| After Stage 1 (k=4) | 10,000 – 30,000 | ~98-99% |
-| After Stage 2 (SPR ≤ 20) | 5,000 – 20,000 | ~30-50% |
+| After Stage 1 (k=5 + group filter) | 10,000 – 30,000 | ~98-99% |
+| After Stage 2 (peak + SPR ≤ 20) | 5,000 – 20,000 | ~30-50% |
 | After Stage 3 (6 criteria) | 10 – 500 | >99% |
 | After Stage 4 (dedup) | 5 – 200 events | — |
 
@@ -208,11 +211,11 @@ else:
 
 ---
 
-## 5. Stage 1 – Energy Threshold
+## 5. Stage 1 – Energy Threshold + Group Filter
 
 ### 5.1 Physical Motivation
 
-A click event carries significantly more energy than background noise. Stage 1 implements a **statistical threshold** on the mean spectral energy of each frame to discard the silent majority (~98–99% of frames in a typical recording).
+A click event carries significantly more energy than background noise. Stage 1 implements a **statistical threshold** on the mean spectral energy of each frame to discard the silent majority (~98–99% of frames in a typical recording). A second sub-step removes **long consecutive runs** of above-threshold frames, which are characteristic of sustained noise bursts (fans spinning up, vibration events) rather than short-duration clicks.
 
 ### 5.2 Energy Metric
 
@@ -227,26 +230,40 @@ where:
 ### 5.3 Threshold Formula
 
 ```
-μ_E = mean(E_frame)     over all N frames
-σ_E = std(E_frame)      over all N frames
+μ_E = mean(E_frame)     over all N frames  (outlier-filtered)
+σ_E = std(E_frame)      over all N frames  (outlier-filtered)
 
-E_threshold = μ_E + k · σ_E    (default k = 4)
+E_threshold = μ_E + k · σ_E    (default k = 5)
 
 Frame i is a Stage 1 CANDIDATE  iff  E_frame[i] > E_threshold
 ```
 
-### 5.4 Statistical Justification
+### 5.4 Group-Size Filter
 
-Under a Gaussian noise model, the false positive probability at the 4σ threshold is:
+After thresholding, consecutive above-threshold frames are grouped into **runs**. Any run whose length exceeds `MAX_RUN = 4` frames is **discarded entirely**:
 
 ```
-P(E_noise > μ + 4σ) = 1 − Φ(4) ≈ 3.2 × 10⁻⁵  (0.003%)
+MAX_RUN = 4
+
+A run of length L:
+  L ≤ 4  →  all frames in the run pass to Stage 2
+  L > 4  →  entire run discarded (sustained noise, not a click)
+```
+
+**Physical rationale:** a genuine cavitation click lasts at most ~2 ms ≈ 1 frame. Even a click straddling two frame boundaries produces at most 2 consecutive above-threshold frames. A run of 5 or more consecutive high-energy frames (≥ 12.8 ms) is almost certainly a sustained noise event (mechanical vibration, motor burst, handling noise) and cannot be a click.
+
+### 5.5 Statistical Justification
+
+Under a Gaussian noise model, the false positive probability at the 5σ threshold is:
+
+```
+P(E_noise > μ + 5σ) = 1 − Φ(5) ≈ 2.9 × 10⁻⁷  (0.00003%)
 
 For 1,406,250 frames (1 hour):
-  Expected false positives ≈ 1,406,250 × 3.2×10⁻⁵ ≈ 45 frames
+  Expected false positives ≈ 1,406,250 × 2.9×10⁻⁷ ≈ 0.4 frames
 ```
 
-These ~45 statistical false positives are eliminated by the subsequent stages.
+These rare statistical false positives are eliminated by the subsequent stages.
 
 **Threshold sensitivity:**
 
@@ -254,27 +271,39 @@ These ~45 statistical false positives are eliminated by the subsequent stages.
 |---|---|---|---|
 | 2 | 2.3% | 30–50% | <1% |
 | 3 | 0.13% | 15–30% | 2–4% |
-| **4** | **0.003%** | **10–20%** | **4–6%** |
-| 5 | 0.00003% | 5–10% | 12–18% |
+| 4 | 0.003% | 10–20% | 4–6% |
+| **5** | **0.00003%** | **5–10%** | **8–12%** |
 
-k = 4 provides the best balance between false positive rate and sensitivity to weak clicks.
+k = 5 is the default, offering very low false-positive rate while remaining adjustable per recording session.
 
 ---
 
-## 6. Stage 2 – Spectral Peak Ratio Filter
+## 6. Stage 2 – FFT Filters (Peak Amplitude + SPR)
 
 ### 6.1 Physical Motivation
 
-Plant ultrasonic emissions (cavitation clicks) are **broadband events** — their energy is spread across many frequency bins simultaneously. In contrast, electromagnetic interference (EMI), tonal noise (fans, motors), and narrowband artefacts concentrate all energy in 1–3 bins. Stage 2 exploits this difference using a simple, amplitude-invariant spectral shape metric.
+Plant ultrasonic emissions (cavitation clicks) are **broadband events** — their energy is spread across many frequency bins simultaneously. In contrast, electromagnetic interference (EMI), tonal noise (fans, motors), and narrowband artefacts concentrate all energy in 1–3 bins. Stage 2 applies **two complementary filters** on the normalized FFT spectrum to discard both amplitude-weak frames and spectrally-tonal frames.
 
-### 6.2 Spectral Peak Ratio (SPR)
+> **Normalization:** before both filters, the raw FFT magnitudes are corrected for the Knowles SPU0410 microphone's non-flat frequency response using a 50%-weight interpolated correction curve. This converts raw ADC counts into calibrated voltage units and ensures that a click at 70 kHz is not unfairly penalised by the microphone's roll-off.
+
+### 6.2 Filter A – Normalized Peak FFT Amplitude
 
 ```
-SPR_i = max_{k} |A_i[k]|²  /  mean_{k} |A_i[k]|²
+peak_norm_i = max_{k} A_i_norm[k]        (over K = 154 bins, in Volt)
+
+Frame i PASSES Filter A  iff  peak_norm_i > min_peak_fft   (default min_peak_fft = 0.85 mV)
+```
+
+**Physical meaning:** even after normalization, the highest single-bin magnitude must clear a minimum voltage. This rejects frames where the entire spectrum sits near the noise floor — frames that passed Stage 1 due to a broad, low-level spectral bump rather than a genuine amplitude event.
+
+### 6.3 Filter B – Spectral Peak Ratio (SPR)
+
+```
+SPR_i = max_{k} |A_i_norm[k]|²  /  mean_{k} |A_i_norm[k]|²
 
 Computed over all K = 154 bins (20–80 kHz).
 
-Frame i PASSES Stage 2  iff  SPR_i ≤ max_spr   (default max_spr = 20)
+Frame i PASSES Filter B  iff  SPR_i ≤ max_spr   (default max_spr = 20)
 ```
 
 **Key property:** SPR is **amplitude-invariant** — it measures the *shape* of the spectrum, not its absolute level. A very loud broadband click still has low SPR; a weak pure tone has high SPR.
@@ -300,7 +329,7 @@ For broadband click with B occupied bins (uniform):
 | Narrowband EMI / motor tone | 1–5 | 30–154 | REJECTED |
 | Pure sine wave | 1–2 | 75–154 | REJECTED |
 
-### 6.3 Descriptive Spectral Ratio R
+### 6.4 Descriptive Spectral Ratio R
 
 The Stage 2 pass evaluates shape only. In addition, a **descriptive spectral ratio** R is computed for post-hoc analysis (not used as a filter):
 
@@ -658,7 +687,20 @@ The final v4.0 algorithm was evaluated on a held-out test session (not used in t
 
 ---
 
-## 12. References
+## 12. Algorithm Version History
+
+| Version | Date | Key changes |
+|---|---|---|
+| v1.0 | Early 2025 | Basic energy threshold + single R² criterion |
+| v2.0 | Late 2025 | Added spectral ratio R, iFFT reconstruction, Hilbert envelope |
+| v2.1 | Early 2026 | R²_log ≥ 0.60–0.80 as primary gate; 22% false-negative rate discovered |
+| **v3.0** | March 2026 | R² removed as gate; replaced with 3-criteria (SNR, pre_snr, E_W1>E_W4) |
+| **v3.1** | March 2026 | Added C4 (asymmetry) and C5 (clean tail / ringing rejection); window extended to 300 samples |
+| **v4.0** | March 2026 | Replaced SNR-relative threshold with absolute peak_iFFT (C1=130 µV); added τ criterion (C5); added R² criterion (C6); reformulated asymmetry as `ratio < 2.5`; Gibbs suppressor v3 (symmetric AND condition); Stage 1 default raised to k=5 + MAX_RUN=4 group filter; Stage 2 normalized peak FFT filter added (0.85 mV) |
+
+---
+
+## 13. References
 
 1. **Khait I., et al.** "Sounds emitted by plants under stress are airborne and informative." *Cell*, 186(7):1328–1336, 2023. https://doi.org/10.1016/j.cell.2023.03.009
 
