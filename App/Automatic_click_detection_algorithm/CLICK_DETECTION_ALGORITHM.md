@@ -266,7 +266,7 @@ k = 4 provides the best balance between false positive rate and sensitivity to w
 
 ### 6.1 Physical Motivation
 
-Bat echolocation calls and plant ultrasonic emissions are **broadband events** — their energy is spread across many frequency bins simultaneously. In contrast, electromagnetic interference (EMI), tonal noise (fans, motors), and narrowband artefacts concentrate all energy in 1–3 bins. Stage 2 exploits this difference using a simple, amplitude-invariant spectral shape metric.
+Plant ultrasonic emissions (cavitation clicks) are **broadband events** — their energy is spread across many frequency bins simultaneously. In contrast, electromagnetic interference (EMI), tonal noise (fans, motors), and narrowband artefacts concentrate all energy in 1–3 bins. Stage 2 exploits this difference using a simple, amplitude-invariant spectral shape metric.
 
 ### 6.2 Spectral Peak Ratio (SPR)
 
@@ -391,8 +391,8 @@ Case C:  peak_idx < 60  AND  frame_idx = 0  (first frame of recording)
 | pre_snr | Meaning | Decision |
 |---|---|---|
 | ≈ 1.0 | Pure silence before click | PASS |
-| 1.0 – 1.7 | Slight background activity | PASS |
-| 1.7 – 3.0 | Moderate background noise | FAIL |
+| 1.0 – 1.8 | Slight background activity | PASS |
+| 1.8 – 3.0 | Moderate background noise | FAIL |
 | > 3.0 | Continuous noise / overlapping signals | FAIL |
 
 ---
@@ -529,19 +529,19 @@ A single click event can energise 2–3 consecutive frames when the click onset 
 ```
 Algorithm:
   1. Sort all Stage 3 survivors by frame_idx
-  2. Group frames with gap ≤ MAX_GAP = 4 consecutive frames
-     (4 frames = 10.24 ms — well above the maximum click duration of ~2 ms)
+  2. Group frames with gap ≤ MAX_GAP = 3 consecutive frames
+     (3 frames = 7.68 ms — well above the maximum click duration of ~2 ms)
   3. Within each group, keep only the frame with maximum peak amplitude
   4. Assign timestamp = frame_start_time of the retained frame
 
 Parameters:
-  MAX_GAP = 4 (detector) / 5 (batch export, slightly more tolerant)
+  MAX_GAP = 3 (identical for both interactive detector and batch export)
 ```
 
 **Effect of MAX_GAP:**
 - Too small (1–2): may produce duplicates for clicks near frame boundaries
 - Too large (8+): risks fusing two distinct clicks that occur close in time
-- Value 4 corresponds to ~10 ms, safely above click duration (< 2.56 ms) but well below typical inter-click interval (> 50 ms in most plants)
+- Value 3 corresponds to ~7.7 ms, safely above click duration (< 2.56 ms) but well below typical inter-click interval (> 50 ms in most plants)
 
 ---
 
