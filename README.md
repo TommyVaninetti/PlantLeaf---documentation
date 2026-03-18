@@ -161,6 +161,9 @@ V(t) = A_exp · exp(-(t-t_peak)/τ) + Vb    for t ≥ t_peak   [repolarization]
 ### Architecture
 - **[LIBRARIES.md](App/LIBRARIES.md)**: Justification for technology choices
 
+### Website and Database
+- **[ WEBSITE-DATABASE.md](App/ WEBSITE-DATABASE.md)**: Sharing of scientific documentation
+
 ---
 
 ## 🔬 Scientific Validation for Acoustic Signals
@@ -214,7 +217,7 @@ This application uses the following open-source libraries:
 **Hardware Design**: Abdoellah El Makkaoui
 **Web/Database**: Frida Tirari
 
-**Contact**: tommasovaninetti8@gmail.com, abdoellah.elmakkaoui@gmail.com
+**Contact**: tommasovaninetti8@gmail.com, abdoellah.elmakkaoui@gmail.com, fridatirari@gmail.com
 
 ---
 
