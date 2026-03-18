@@ -162,7 +162,7 @@ V(t) = A_exp · exp(-(t-t_peak)/τ) + Vb    for t ≥ t_peak   [repolarization]
 - **[LIBRARIES.md](App/LIBRARIES.md)**: Justification for technology choices
 
 ### Website and Database
-- **[ WEBSITE-DATABASE.md](App/ WEBSITE-DATABASE.md)**: Sharing of scientific documentation
+- **[WEBSITE-DATABASE.md](App/ WEBSITE-DATABASE.md)**: Sharing of scientific documentation
 
 ---
 
