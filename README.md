@@ -5,6 +5,7 @@
 [![PySide6](https://img.shields.io/badge/PySide6-6.9.0-green.svg)](https://doc.qt.io/qtforpython/)
 
 **PlantLeaf** is a powerful desktop application specifically designed for **plant bioacoustics and bioelectric research**, enabling real-time acquisition and analysis of ultrasonic click events and voltage signals (action potentials) in plants.
+All the source code is available under AGPLv3 licence at [PlantLeaf-Desktop-App](https://github.com/TommyVaninetti/PlantLeaf-Desktop-App). We appreciate any form of help!
 
 ---
 
@@ -76,6 +77,7 @@ and wants to provide a deep and open understanding of the process
 - **Adaptive thresholding** based on background noise estimation
 - **False-positive suppression** using spectral coherence analysis
 - **Batch processing** for entire recordings
+- **Version v5 is currently under development**
 
 **BIOELECTRIC REACTION**
 
@@ -144,7 +146,10 @@ V(t) = A_exp · exp(-(t-t_peak)/τ) + Vb    for t ≥ t_peak   [repolarization]
 
 ---
 
-## 📚 Documentation
+## Source Code
+- **[PlantLeaf-Desktop-App](https://github.com/TommyVaninetti/PlantLeaf-Desktop-App). All the source code is available here.**
+
+## Documentation
 
 ### User Guides
 - **[NORMALIZATION_USER_GUIDE.md](App/NORMALIZATION_USER_GUIDE.md)**: How to use the microphone normalization feature
@@ -154,7 +159,8 @@ V(t) = A_exp · exp(-(t-t_peak)/τ) + Vb    for t ≥ t_peak   [repolarization]
 ### Technical Specifications
 - **[FFT_PHASE_TECHNICAL_SPECIFICATION.md](App/FFT_and_acquisition_specifications/FFT_PHASE_TECHNICAL_SPECIFICATION.md)**: Mathematical foundation of FFT/iFFT processing
 - **[MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md](App/normalization_feature/MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md)**: Error analysis and validation (±2.9 dB accuracy)
-- **[CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md](App/Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM.md)**: Automatic click detector information
+- **[CLICK_DETECTION_ALGORITHM_v4.md](App/Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v4.md)**: Automatic click detector information v4
+- **[CLICK_DETECTION_ALGORITHM_v5.md](App/Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v5.md)**: Automatic click detector information v5
 - **[VOLTAGE_HARDWARE.md](Hardware/VOLTAGE_HARDWARE.md)**: Detailed info about the ESEB board
 - **[AUDIO_HARDWARE.md](Hardware/AUDIO_HARDWARE.md)**: Detailed info about ASEB board
 
@@ -171,7 +177,6 @@ V(t) = A_exp · exp(-(t-t_peak)/τ) + Vb    for t ≥ t_peak   [repolarization]
 ### Published Research Context
 This tool was developed following methodologies from:
 - **Khait et al. (2023)**: *Sounds emitted by plants under stress are airborne and informative*. Cell, 186(7), 1328-1336.
-- **Baudin et al. (2024)**: *Plant bioacoustics: methods and applications*. Journal of Plant Physiology.
 
 ### Error Budget
 - **Amplitude accuracy**: ±2.9 dB (95% confidence) after normalization
@@ -195,7 +200,7 @@ This tool was developed following methodologies from:
 ## 📄 License & Compliance
 
 ### Application License
-NOT IMPLEMENTED YET
+The Software is licenced under the **AGPLv3 licence** 
 
 ### Open-Source Components
 This application uses the following open-source libraries:
@@ -223,8 +228,8 @@ This application uses the following open-source libraries:
 
 ## 🏆 Competitions & Recognition
 
-- **FAST i Giovani e le Scienze 2026** - Italian Finals Qualifier
-- Target: European Union Contest for Young Scientists (EUCYS) and Regeneron ISEF
+- **FAST i Giovani e le Scienze 2026** - Italian Finals 1st overall winners
+- Target: European Union Contest for Young Scientists (EUCYS), September 2026
 
 ---
 
@@ -239,11 +244,11 @@ We are more than happy to collaborate
 
 ## 🔗 Related Resources
 
-- **Official Website**: www.plantleaf.it
-- **Research Paper**: -
+- **Official Website**: [www.plantleaf.it](www.plantleaf.it)
+- **Research Paper**: 
 
 ---
 
-**Last Updated**: March 11, 2026  
-**Version**: 1.0.0-beta  
+**Last Updated**: May 22, 2026  
+**Version**: 1.0.0
 **Project Status**: 🟢 Active Development
