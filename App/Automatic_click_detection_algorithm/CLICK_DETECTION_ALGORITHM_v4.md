@@ -691,9 +691,9 @@ The final v4.0 algorithm was evaluated on a held-out test session (not used in t
 
 | Version | Date | Key changes |
 |---|---|---|
-| v1.0 | Early 2025 | Basic energy threshold + single R² criterion |
-| v2.0 | Late 2025 | Added spectral ratio R, iFFT reconstruction, Hilbert envelope |
-| v2.1 | Early 2026 | R²_log ≥ 0.60–0.80 as primary gate; 22% false-negative rate discovered |
+| v1.0 | Late 2025 | Basic energy threshold |
+| v2.0 | Late 2025 | Added spectral ratio R, iFFT reconstruction |
+| v2.1 | Early 2026 | R²_log ≥ 0.60–0.80 as primary gate |
 | **v3.0** | March 2026 | R² removed as gate; replaced with 3-criteria (SNR, pre_snr, E_W1>E_W4) |
 | **v3.1** | March 2026 | Added C4 (asymmetry) and C5 (clean tail / ringing rejection); window extended to 300 samples |
 | **v4.0** | March 2026 | Replaced SNR-relative threshold with absolute peak_iFFT (C1=130 µV); added τ criterion (C5); added R² criterion (C6); reformulated asymmetry as `ratio < 2.5`; Gibbs suppressor v3 (symmetric AND condition); Stage 1 default raised to k=5 + MAX_RUN=4 group filter; Stage 2 normalized peak FFT filter added (0.85 mV) |

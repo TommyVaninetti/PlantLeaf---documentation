@@ -228,6 +228,8 @@ This application uses the following open-source libraries:
 
 ## 🏆 Competitions & Recognition
 
+- **FAST i Giovani e le Scienze 2026** - Italian Finals Winners
+- **EUCYS - European Union Contest for Young Scientists 2026** - Final in September 2026
 - **FAST i Giovani e le Scienze 2026** - Italian Finals 1st overall winners
 - Target: European Union Contest for Young Scientists (EUCYS), September 2026
 
@@ -235,17 +237,16 @@ This application uses the following open-source libraries:
 
 ## 🤝 Contributing
 
-This is an academic research project developed for scientific competitions.
-
-For questions or collaboration inquiries, please open an issue or contact the maintainer. 
-We are more than happy to collaborate
+Our mission is to make this field accessible to everyone.
+We believe that only by creating a community we will be able achieve the best results.
+We are more than happy to collaborate with anyone that is interested, so please don't hesitate to contact us!
 
 ---
 
 ## 🔗 Related Resources
 
 - **Official Website**: [www.plantleaf.it](www.plantleaf.it)
-- **Research Paper**: 
+- **Research Paper**: we're planning to publish our research in the future
 
 ---
 

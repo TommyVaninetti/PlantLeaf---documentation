@@ -68,7 +68,7 @@ pip install PySide6==6.9.0
 
 **Why PyQtGraph?**
 - ✅ **High Performance**: Hardware-accelerated OpenGL rendering for >1000 FPS
-- ✅ **Real-Time Capable**: Updates at 390 FPS (FFT frame rate) without lag
+- ✅ **Real-Time Capable**: Updates at 60 FPS (though the FFT frame rate is 390, it'd be useless and impossible to plot all data on a normal screen) without lag
 - ✅ **Qt Integration**: Native PySide6/PyQt6 compatibility
 - ✅ **Scientific Features**: Logarithmic axes, crosshairs, region selection
 - ✅ **Zero Dependencies**: Pure Python + NumPy (no external C libraries)
@@ -95,7 +95,7 @@ pip install pyqtgraph
 - `GraphicsLayoutWidget`: Multi-plot layouts (e.g., FFT + time-domain)
 
 **Alternatives Considered**:
-- **Matplotlib**: Standard library for scientific plotting, but **too slow** for real-time (>50 ms update latency)
+- **Matplotlib**: Standard library for scientific plotting, but **too slow** for real-time
 - **Plotly**: Interactive web-based plots, but **resource-heavy** and not Qt-native
 - **Vispy**: OpenGL-accelerated, but **less mature** and steeper learning curve
 
@@ -420,57 +420,6 @@ def load_theme(theme_name):
 | **SciPy** | Latest | BSD | Signal processing | Custom (not recommended) |
 | **PySerial** | Latest | BSD | USB communication | PyUSB (complex) |
 | **PyInstaller** | Latest | GPL | Deployment | cx_Freeze (less mature) |
-
----
-
-## Performance Benchmarks
-
-### Real-Time Acquisition (Audio Mode)
-
-**Test Setup**: Intel i7, 16GB RAM, macOS 13
-
-| Operation | Time (ms) | CPU % | Notes |
-|-----------|-----------|-------|-------|
-| Serial read (770 bytes) | 2-5 | 1-2% | USB CDC latency |
-| FFT spectrum plot update | 3-8 | 5-10% | PyQtGraph rendering |
-| Data buffer append | <1 | <1% | NumPy array operation |
-| Click detection check | 1-3 | 2-5% | Threshold + spectral analysis |
-| **Total frame processing** | **6-17 ms** | **8-18%** | At 390 FPS (2.56 ms frame duration) |
-
-**Conclusion**: Application runs comfortably at 390 FPS with <20% CPU usage, leaving headroom for other tasks.
-
-### Analysis Mode (iFFT Reconstruction)
-
-| Operation | Time (ms) | Notes |
-|-----------|-----------|-------|
-| 512-point iFFT (NumPy) | 0.2 | `numpy.fft.irfft()` |
-| Tukey window generation | 0.01 | `scipy.signal.windows.tukey()` |
-| Complex spectrum construction | 0.05 | Magnitude × exp(j·phase) |
-| Plot rendering | 5-10 | PyQtGraph update |
-| **Total iFFT workflow** | **5-10 ms** | Interactive (60 FPS UI) |
-
----
-
-## Future Considerations
-
-### Potential Upgrades
-
-1. **GPU Acceleration (CuPy)**:
-   - **When**: If FFT size increases to 2048+ samples
-   - **Benefit**: 10-50× speedup for large FFTs
-   - **Cost**: NVIDIA GPU requirement, CUDA dependency
-
-2. **Numba (JIT Compilation)**:
-   - **When**: For custom algorithms (e.g., advanced click classifiers)
-   - **Benefit**: 10-100× speedup for Python loops
-   - **Cost**: Debugging complexity, compilation overhead
-
-3. **Cython (C Extension)**:
-   - **When**: Performance bottlenecks in critical paths
-   - **Benefit**: C-level performance with Python API
-   - **Cost**: Build system complexity, platform-specific compilation
-
-**Current Decision**: Stick with pure Python + NumPy/SciPy. Current performance (390 FPS acquisition, <20% CPU) is sufficient for scientific use. Premature optimization is the root of all evil.
 
 ---
 
