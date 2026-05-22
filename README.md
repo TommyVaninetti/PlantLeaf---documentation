@@ -36,8 +36,6 @@ This repository focuses on:
 - **software and firmware** developed by **Tommaso Vaninetti**
 - **hardware** developed by **Abdoellah El Makkaoui**
 
-and wants to provide a deep and open understanding of the process
-
 ## 🚀 Key Features
 
 ### 📡 Real-Time Acquisition
