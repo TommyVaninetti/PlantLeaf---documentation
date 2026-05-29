@@ -1,4 +1,4 @@
-# 🌿 PlantLeaf Desktop Application
+# PlantLeaf Documentation
 
 ![Version](https://img.shields.io/badge/version-1.0.0--beta-blue.svg)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
@@ -9,7 +9,7 @@ All the source code is available under AGPLv3 licence at [PlantLeaf-Desktop-App]
 
 ---
 
-## 🎯 Project Overview
+## Overview
 
 PlantLeaf bridges the gap between rigorous scientific analysis and creative exploration, providing:
 
@@ -19,7 +19,7 @@ PlantLeaf bridges the gap between rigorous scientific analysis and creative expl
 - **Advanced Analysis Tools**: Phase-preserving FFT, inverse FFT reconstruction, click detection algorithms, microphone normalization, automatic fitting for action potential
 - **Cheap Instrumentation**: Custom hardware designed to be both cheap and scientifically rigorous 
 
-### 🔬 Scientific Capabilities
+### Scientific Capabilities
 
 - **Frequency Range**: 20-80 kHz (ultrasonic band optimized for SPU0410LR5H-QB microphone)
 - **Sampling Rate**: 200 kHz (Audio) / 50Hz-1kHz (Voltage)
@@ -30,15 +30,15 @@ PlantLeaf bridges the gap between rigorous scientific analysis and creative expl
 
 ---
 
-## 📂 Repository Structure
+## Repository Structure
 
 This repository focuses on:
 - **software and firmware** developed by **Tommaso Vaninetti**
 - **hardware** developed by **Abdoellah El Makkaoui**
 
-## 🚀 Key Features
+## Key Features
 
-### 📡 Real-Time Acquisition
+### Real-Time Acquisition
 
 #### Audio Mode (Ultrasonic Clicks)
 - **512-sample FFT** at 390 FFTs per second for real-time spectral analysis
@@ -54,7 +54,7 @@ This repository focuses on:
 - **Event annotation** with timestamps
 - **CSV export** for external analysis
 
-### 🔬 Advanced Analysis Tools
+### Advanced Analysis Tools
 
 **ULTRASONIC CLICKS**
 
@@ -123,7 +123,7 @@ V(t) = A_exp · exp(-(t-t_peak)/τ) + Vb    for t ≥ t_peak   [repolarization]
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 ### Core Technologies
 - **Python 3.8+**: Application logic
@@ -140,7 +140,7 @@ V(t) = A_exp · exp(-(t-t_peak)/τ) + Vb    for t ≥ t_peak   [repolarization]
 - **CMSIS-DSP**: Hardware-accelerated FFT (`arm_rfft_fast`)
 - **USB CDC**: Virtual COM port for data streaming
 
-📖 **Detailed library rationale**: See [LIBRARIES.md](App/LIBRARIES.md)
+**Detailed library rationale**: See [LIBRARIES.md](App/LIBRARIES.md)
 
 ---
 
@@ -170,7 +170,7 @@ V(t) = A_exp · exp(-(t-t_peak)/τ) + Vb    for t ≥ t_peak   [repolarization]
 
 ---
 
-## 🔬 Scientific Validation for Acoustic Signals
+## Scientific Validation for Acoustic Signals
 
 ### Published Research Context
 This tool was developed following methodologies from:
@@ -195,7 +195,7 @@ This tool was developed following methodologies from:
 
 ---
 
-## 📄 License & Compliance
+## License & Compliance
 
 ### Application License
 The Software is licenced under the **AGPLv3 licence** 
@@ -214,7 +214,7 @@ This application uses the following open-source libraries:
 
 ---
 
-## 👥 Team
+## Team
 
 **Software & Firmware**: Tommaso Vaninetti  
 **Hardware Design**: Abdoellah El Makkaoui
@@ -224,7 +224,7 @@ This application uses the following open-source libraries:
 
 ---
 
-## 🏆 Competitions & Recognition
+## Competitions & Recognition
 
 - **FAST i Giovani e le Scienze 2026** - Italian Finals Winners
 - **EUCYS - European Union Contest for Young Scientists 2026** - Final in September 2026
@@ -233,7 +233,7 @@ This application uses the following open-source libraries:
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Our mission is to make this field accessible to everyone.
 We believe that only by creating a community we will be able achieve the best results.
@@ -241,7 +241,7 @@ We are more than happy to collaborate with anyone that is interested, so please 
 
 ---
 
-## 🔗 Related Resources
+## Related Resources
 
 - **Official Website**: [www.plantleaf.it](www.plantleaf.it)
 - **Research Paper**: we're planning to publish our research in the future
