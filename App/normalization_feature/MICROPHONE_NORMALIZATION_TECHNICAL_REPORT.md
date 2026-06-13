@@ -1,4 +1,4 @@
-# 📊 Technical Report: SPU0410LR5H-QB Microphone Frequency Response Normalization
+# Technical Report: SPU0410LR5H-QB Microphone Frequency Response Normalization
 
 **Document Version:** 1.0  
 **Date:** February 26, 2026  
@@ -13,11 +13,11 @@
 This document describes the implementation of a **conservative frequency response correction** (50% normalization) for ultrasonic click analysis in plant bioacoustics research using the SPU0410LR5H-QB MEMS microphone.
 
 ### Key Findings:
-- ✅ **Approach**: Non-destructive, display-only normalization
-- ✅ **Method**: 50% correction based on manufacturer datasheet
-- ✅ **Estimated Error**: ±2.9 dB (σ ≈ 1.0 dB)
-- ✅ **Application**: Qualitative analysis (shape, presence/absence)
-- ⚠️ **Limitation**: NOT suitable for absolute SPL measurements
+- **Approach**: Non-destructive, display-only normalization
+- **Method**: 50% correction based on manufacturer datasheet
+- **Estimated Error**: ±2.9 dB (σ ≈ 1.0 dB)
+- **Application**: Qualitative analysis (shape, presence/absence)
+- **Limitation**: NOT suitable for absolute SPL measurements
 
 ---
 
@@ -36,7 +36,7 @@ The SPU0410LR5H-QB MEMS microphone exhibits **non-flat frequency response** in t
 ### 2.2 Objective
 
 Apply a **moderate, scientifically defensible correction** that:
-1. Improves spectral flatness for relative comparisons
+1. Improves spectral flatness for relative comparisons and fit
 2. Maintains data integrity (non-destructive)
 3. Quantifies and documents error margins
 4. Enables publication-grade analysis
@@ -89,7 +89,7 @@ correction_gain_100 = 10 ** (-mic_response_db / 20.0)
 
 **Problem**: At 25 kHz (+10.5 dB peak), full correction requires:
 - Gain = 10^(-10.5/20) = 0.298 (divide by 3.35x)
-- **Amplifies noise by 3.35x** → SNR degradation of -10.5 dB ❌
+- **Amplifies noise by 3.35x** → SNR degradation of -10.5 dB
 
 #### Conservative Correction (50% - IMPLEMENTED):
 ```python
@@ -100,13 +100,13 @@ correction_gain_50 = 10 ** (-mic_response_db * 0.5 / 20.0)
 **At 25 kHz**:
 - Corrected response = +10.5 dB × 0.5 = +5.25 dB remaining
 - Gain = 10^(-5.25/20) = 0.547 (divide by 1.83x)
-- **Noise amplification: 1.83x** → SNR degradation of -5.25 dB ✅
+- **Noise amplification: 1.83x** → SNR degradation of -5.25 dB
 
 **At 60 kHz** (worst attenuation):
 - Original response = -5.5 dB
 - Corrected response = -5.5 dB × 0.5 = -2.75 dB remaining
 - Gain = 10^(2.75/20) = 1.37 (multiply by 1.37x)
-- **Noise amplification: 1.37x** → SNR degradation of -2.75 dB ✅
+- **Noise amplification: 1.37x** → SNR degradation of -2.75 dB
 
 ### 3.4 Application Domain
 
@@ -182,16 +182,16 @@ For a measured click with **amplitude = 0.1 V** after 50% normalization:
 - **Frequency-dependent**: ±20% at 25 kHz, ±35% at 60 kHz
 
 **Acceptable for**:
-- ✅ Comparing clicks within same recording
-- ✅ Before/after stimulus comparisons
-- ✅ Presence/absence detection
-- ✅ Temporal pattern analysis
+- Comparing clicks within same recording
+- Before/after stimulus comparisons
+- Presence/absence detection
+- Temporal pattern analysis
 
 **NOT acceptable for**:
-- ❌ Absolute sound pressure level (dB SPL)
-- ❌ Comparisons between different microphones
-- ❌ Energy budget calculations
-- ❌ Quantitative biomechanical models
+- Absolute sound pressure level (dB SPL)
+- Comparisons between different microphones
+- Energy budget calculations
+- Quantitative biomechanical models
 
 ---
 
@@ -230,82 +230,20 @@ def normalize_fft_50_percent(fft_magnitude, frequency_axis):
     return corrected_fft, correction_gain
 ```
 
-### 5.2 Safety Checks
-
-#### Pre-Normalization Validation:
-1. **Saturation check**: Verify original signal < 90% of ADC range
-2. **SNR check**: Baseline noise < -15 dB relative to signal
-3. **Data integrity**: No NaN or Inf values in FFT
-
-#### Post-Normalization Validation:
-1. **Gain limit**: No frequency amplified > 2.0x (6 dB)
-2. **Physical bounds**: Corrected amplitude ≤ 3.3V (ADC limit)
-3. **Spectral coherence**: Correlation with original > 0.85
-
-### 5.3 User Interface
-
-**Display Elements**:
-- ✅ **Overlay curves**
-- ✅ **Legend**: Clear labeling with "50% Normalized" tag
-- ✅ **Toggle button**: Show/hide normalized curve
-
-**User Warnings**:
-```
-⚠️ Normalization applied: 50% conservative correction
-📊 Estimated error: ±2.9 dB (95% confidence)
-🔬 Suitable for qualitative analysis only
-📝 Original data unchanged (display-only)
-```
-
 ---
 
-## 6. VALIDATION STRATEGY
+## 6. SCIENTIFIC PUBLICATION GUIDELINES
 
-### 6.1 Recommended Tests
-
-#### A. Known Source Test
-**Setup**: Calibrated ultrasonic speaker (40 kHz, 80 dB SPL)  
-**Procedure**:
-1. Record with raw SPU0410LR5H-QB
-2. Apply 50% normalization
-3. Compare with reference microphone (calibrated)
-4. Verify corrected amplitude within ±3 dB of reference
-
-#### B. Frequency Sweep Test
-**Setup**: Generate 20-80 kHz tone sweep at constant amplitude  
-**Expected**:
-- Raw data shows +10 dB peak at 25 kHz
-- Normalized data shows ±2 dB flatness across 20-80 kHz
-
-#### C. Noise Floor Test
-**Setup**: Record ambient noise (no signal)  
-**Expected**:
-- SNR should NOT degrade below 6 dB after normalization
-- If SNR < 6 dB → Data too noisy for correction
-
-### 6.2 Acceptance Criteria
-
-| Metric                     | Target        | Pass/Fail |
-|----------------------------|---------------|-----------|
-| Spectral flatness (20-80kHz)| ±5 dB         | PASS if ±6 dB |
-| SNR degradation            | < 6 dB        | PASS if < 8 dB |
-| Amplitude error vs. calibrated mic | < 3 dB | PASS if < 5 dB |
-| Correlation with raw data  | > 0.85        | PASS if > 0.80 |
-
----
-
-## 7. SCIENTIFIC PUBLICATION GUIDELINES
-
-### 7.1 Methods Section Template
+### 6.1 Methods Section Template
 
 > *"Ultrasonic click events were recorded using a Knowles SPU0410LR5H-QB MEMS microphone (fs = 200 kHz, 20-80 kHz bandpass). Raw FFT spectra were corrected for microphone frequency response using a conservative 50% normalization approach based on manufacturer datasheet curves (Knowles Acoustics Rev. H, 2013). Correction gains ranged from 0.55x (25 kHz) to 1.37x (60 kHz), resulting in an estimated spectral error of ±2.9 dB (95% confidence). This correction improves relative spectral comparisons while maintaining data traceability. All reported values represent normalized data unless otherwise noted; raw data available upon request."*
 
-### 7.2 Figure Captions
+### 6.2 Figure Captions
 
 **Example**:
 > *"Figure 3: Representative ultrasonic click event from [species]. (A) Raw FFT spectrum (blue) and 50%-normalized spectrum (orange). (B) Time-domain reconstruction via iFFT. Normalization corrects for SPU0410LR5H-QB frequency response (±2.9 dB error). Peak frequency: 42.3 kHz (normalized), duration: 0.3 ms."*
 
-### 7.3 Limitations to Declare
+### 6.3 Limitations to Declare
 
 **Required Disclosures**:
 1. "Correction based on preliminary manufacturer data, not individual calibration"
@@ -315,14 +253,14 @@ def normalize_fft_50_percent(fft_magnitude, frequency_axis):
 
 ---
 
-## 8. FUTURE IMPROVEMENTS
+## 7. FUTURE IMPROVEMENTS
 
-### 8.1 Individual Calibration
+### 7.1 Individual Calibration
 **Goal**: Measure actual frequency response of THIS specific microphone  
 **Method**: Anechoic chamber + calibrated ultrasonic source  
 **Benefit**: Reduce uncertainty from ±2.9 dB to ±0.5 dB
 
-### 8.2 Adaptive Normalization
+### 7.2 Adaptive Normalization
 **Goal**: Adjust correction strength based on SNR  
 **Algorithm**:
 ```python
@@ -334,45 +272,34 @@ else:
     correction_factor = 0.3  # Conservative
 ```
 
-### 8.3 Multi-Microphone Validation
+### 7.3 Multi-Microphone Validation
 **Goal**: Cross-validate clicks with multiple microphone types  
 **Setup**: SPU0410LR5H-QB + calibrated reference + piezo sensor  
 **Benefit**: Quantify accuracy of corrected spectra
 
 ---
 
-## 9. CONCLUSIONS
+## 8. CONCLUSIONS
 
-### 9.1 Summary
+### 8.1 Summary
 
 The implemented **50% conservative normalization** provides:
-- ✅ Improved spectral flatness (±5 dB vs ±16 dB raw)
-- ✅ Manageable error margin (±2.9 dB)
-- ✅ Non-destructive workflow (original data preserved)
-- ✅ Publication-suitable methodology
-
-### 9.2 Recommendations
-
-**For Plant Click Research**:
-1. **Always report BOTH raw and normalized data** in figures
-2. **Use normalized data for spectral shape analysis**
-3. **Use raw data for amplitude thresholding**
-4. **Declare limitations** in methods section
-5. **Consider individual calibration** for high-precision studies
+- Improved spectral flatness (±5 dB vs ±16 dB raw)
+- Manageable error margin (±2.9 dB)
+- Non-destructive workflow (original data preserved)
+- Publication-suitable methodology
 
 ---
 
-## 10. REFERENCES
+## 9. REFERENCES
 
 1. Knowles Acoustics (2013). *SPU0410LR5H-QB Datasheet Rev. H*. https://media.digikey.com/pdf/Data%20Sheets/Knowles%20Acoustics%20PDFs/SPU0410LR5H-QB_RevH_3-27-13.pdf
 
 2. Khait, I., et al. (2023). *Sounds emitted by plants under stress are airborne and informative*. Cell, 186(7), 1328-1336.
 
-3. Baudin, F., et al. (2024). *Plant bioacoustics: methods and applications*. Journal of Plant Physiology, 292, 154135.
+3. ISO 266:1997. *Acoustics — Preferred frequencies*. International Organization for Standardization.
 
-4. ISO 266:1997. *Acoustics — Preferred frequencies*. International Organization for Standardization.
-
-5. Brüel & Kjær (2022). *Microphone Handbook Vol. 1: Theory*. Technical Review.
+4. Brüel & Kjær (2022). *Microphone Handbook Vol. 1: Theory*. Technical Review.
 
 ---
 
