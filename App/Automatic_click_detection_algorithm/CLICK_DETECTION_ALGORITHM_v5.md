@@ -1,7 +1,7 @@
 # PlantLeaf – Automatic Ultrasonic Click Detection Algorithm
 
 **Version:** 5.0 (draft)
-**Date:** May 2026
+**Date:** June 2026
 **Authors:** Tommaso Vaninetti
 **Repository:** [PlantLeaf-Desktop-App](https://github.com/TommyVaninetti/PlantLeaf-Desktop-App)
 
@@ -37,10 +37,11 @@ Version 4.0 was designed and validated primarily in **controlled indoor environm
 - **Impulsive outdoor noise**: transient events (claps, footsteps, mechanical impacts) produce FFT patterns superficially similar to clicks — broadband, brief, high-energy — and pass multiple v4 criteria.
 - **Hardware coupling artefacts**: without rigid mounting, PCB vibrations couple mechanically into the MEMS microphone, producing low-frequency broadband bursts concentrated near the 20 kHz analysis band edge.
 - **Tonal interference**: some outdoor environments (and the MCU itself) produce narrowband tones at fixed frequencies (e.g. 40 kHz, 80 kHz) that pass energy thresholds.
+- **Hardware developments**: with future evolutions in the hardware follows the need of parameters without fixed energy thresholds.
 
 v5 addresses all of these with: an adaptive noise estimator, a more robust run-length filter in Stage 1, a fully redesigned set of Stage 3 features, and an improved decay fit pipeline. All hard thresholds from v4 are replaced with **dimensionless, scale-invariant features** suitable for an SVM classifier.
 
-> **Principal Design:** no single experimentally chosen threshold. All parameters are either physically motivated constants or features fed to an SVM. The noise floor and its standard deviation are the two fundamental quantities from which most features are derived, ensuring invariance to hardware gain and environmental amplitude changes.
+> **Principal Design:** no single experimentally chosen threshold. All parameters are either physically motivated constants or features fed to an SVM. The noise floor and its standard deviation are the two fundamental quantities from which most features are derived, ensuring invariance to hardware gain and environmental amplitude changes. The SVM will be trained with hundreds of events coming from over 300 hours of recordings.
 
 ---
 
@@ -84,56 +85,245 @@ Unchanged from v4. Key parameters:
 
 ### 4.1 Motivation
 
-The v4 `noise_rms` was computed once per session from randomly sampled silent frames. This worked indoors but fails outdoors where the noise floor drifts over seconds (wind gusts, passing vehicles, changing humidity). v5 replaces this with a **sliding-window minimum-statistics estimator** that tracks the noise floor locally in time.
+The v4 `noise_rms` was computed once per session from randomly sampled silent frames. This worked indoors but fails outdoors where the noise floor drifts over seconds (wind gusts, passing vehicles, changing humidity). v5 replaces this with **two parallel sliding-window minimum-statistics estimators** — one operating in the FFT energy domain (for Stage 1) and one operating in the iFFT/Hilbert envelope domain (for Stage 3 features). Both share the same burst protection gate and the same window length W.
 
-### 4.2 Frame Energy
+> **Why two separate estimators?** Stage 1 operates on FFT frame energy (a scalar in V²/bin). Stage 3 features require `noise_floor` and `std_noise` in physical voltage units of the Hilbert envelope (µV). These two quantities are related but not trivially convertible — the iFFT reconstruction, Tukey taper, and Hilbert transform all affect the amplitude distribution in ways that depend on the specific signal chain. Computing each estimator directly in its own domain avoids any calibration coefficient and ensures accuracy regardless of hardware changes.
 
-Each frame's energy is computed identically to Stage 1:
+---
+
+### 4.2 Shared Definitions
+
+**Frame energy (FFT domain):**
 
 ```
 E_i = (1/K) · Σ_{k=0}^{K-1} |A_i[k]|²
 
-K = 154  (number of transmitted bins)
+K = 154  (number of transmitted bins, 20–80 kHz)
+Units: V²  (normalized FFT magnitudes)
 ```
 
-### 4.3 Sliding Window Minimum
+**Per-frame envelope statistics (iFFT domain):**
 
-A circular buffer of the last **W frames** is maintained. The noise floor estimate for frame i is:
+For every frame i (including silent frames), reconstruct the iFFT and compute the Hilbert envelope A[n], then extract two scalars:
 
 ```
-Ê_floor(i) = β · min_{j ∈ [i-W, i]} E_j
+env_mean_i = mean(A[n])    over 512 samples
+env_std_i  = std(A[n])     over 512 samples
+Units: V  (physical voltage of reconstructed signal)
 ```
 
-- **β** is a correction coefficient > 1, because the minimum underestimates the true mean noise floor. Martin (2001) suggests β ≈ 1.5 as a starting point; verify experimentally on your recordings.
-- **W** must be long enough that the minimum is stable (avoiding burst noise setting a false low floor) but short enough to track real floor changes (wind steps):
-  - Long enough: minimum stable → avoid bursts ≥ 30 ms → W ≥ ~20 frames
-  - Short enough: floor changes like wind steps on timescales of ~1–2 s → W ≤ ~750 frames
-  - **Chosen: W = 750 frames (~1.92 s)** → RAM ≈ 750 × 4 bytes ≈ 3 kB on STM32F411
+> **Implementation note (offline PC):** computing iFFT + Hilbert for every frame adds negligible overhead on a PC. For future STM32 firmware with hardware analog bandpass filters (Phase 2/3 hardware), the time-domain signal is directly available from the ADC — no iFFT reconstruction is needed and the envelope statistics can be computed directly from ADC samples.
 
-### 4.4 Burst Protection
+---
 
-Impulsive outdoor noise (a clap, a car door) must not contaminate the minimum estimate. A frame is excluded from the minimum calculation if it is **energetic**:
+### 4.3 Window Length
+
+Both buffers use the same window length:
+
+```
+W = 750 frames  (~1.92 s at 390 FPS)
+```
+
+**Motivation:**
+- Long enough to avoid burst noise dominating the minimum: a burst of 30–50 ms corresponds to ~20 frames — negligible in a window of 750.
+- Short enough to track real floor changes: wind gusts, passing vehicles, and environmental transitions occur on timescales of 1–5 s. W = 750 frames ≈ 1.92 s tracks these adequately.
+
+---
+
+### 4.4 Burst Protection (shared gate)
+
+Both buffers share the same burst protection condition, evaluated once per frame using the FFT energy:
 
 ```
 if E_i > α · Ê_floor(i-1):
-    discard E_i from minimum calculation  (do not update buffer)
+    → frame is energetic (burst or click candidate)
+    → do NOT update Buffer 1 (E_i excluded from minimum)
+    → do NOT update Buffer 2 (env_mean_i, env_std_i excluded)
+else:
+    → frame is silent
+    → update both buffers normally
 ```
 
-- **α** controls the burst exclusion threshold. Suggested starting value: **α = 2**. Verify experimentally.
+**α = 4** (suggested starting value — verify experimentally on outdoor recordings).
 
-### 4.5 std_noise Estimation
+**Physical meaning:** a burst frame has energy more than twice the current floor estimate. Using the same gate for both buffers ensures that a click candidate never contaminates either noise estimate simultaneously.
 
-The standard deviation of the noise is estimated from the same buffer of non-burst frames:
+---
+
+### 4.5 Buffer 1 — FFT Domain (for Stage 1)
 
 ```
-std_noise(i) ≈ std({ E_j : j ∈ [i-W, i], E_j ≤ α · Ê_floor })
+CIRCULAR BUFFER: B1[], length W = 750
+Updated only for non-burst frames: B1[i mod W] = E_i
 ```
 
-`noise_floor` and `std_noise` together are the two fundamental quantities used in all downstream features.
+**Why not a pure minimum?**
 
-### 4.6 STM32 Compatibility
+A single anomalously low frame (microphone dropout, ADC glitch, momentary silence
+between two noise events) can pull `min(B1)` far below the true noise floor,
+causing the Stage 1 threshold to drop and producing a burst of false positives.
+Stahl et al. (2000) proposed using the q-th quantile of the buffer as a more
+robust alternative. However, Rangachari & Loizou (2006) showed experimentally
+that a fixed global percentile is fragile when the noise distribution changes —
+the correct quantile depends on the noise type, which varies outdoors.
 
-The sliding window minimum and the circular buffer are entirely computable on the STM32F411 with integer arithmetic. The buffer of W=750 float32 values requires ~3 kB of RAM, well within the 128 kB SRAM of the STM32F411.
+**Adopted solution: median of local minima (M sub-windows)**
+
+Divide B1[] into M = 10 non-overlapping sub-windows of W/M = 75 frames each.
+Compute the minimum of each sub-window, then take the median of those M minima:
+
+```
+Sub-windows: S_1, S_2, ..., S_10   (75 frames each, ~192 ms each)
+
+m_j = min_{i ∈ S_j} B1[i]         for j = 1, ..., 10
+
+Ê_floor(i) = β · median(m_1, ..., m_10)
+```
+
+**Why this is robust:** a single anomalously low frame affects at most one of
+the 10 sub-window minima. The median of 10 values is insensitive to a single
+outlier — it would need 5 out of 10 sub-windows to be contaminated to shift
+the median, which is physically implausible for isolated glitches.
+
+**Why β is still needed:** each local minimum still underestimates the true
+sub-window mean (the minimum of N samples from a distribution is always below
+the mean). β = 1.3 corrects this bias, consistent with Martin (2001).
+
+```
+β = 1.3  (slightly smaller than 1.5 Martin 2001 correction factor)
+
+RAM:  B1[] buffer:          750 × 4 bytes = 3.0 kB
+      local minima array:    10 × 4 bytes = 0.04 kB
+      Total Buffer 1:                     = 3.04 kB
+
+STM32 cost: sub-window minimum updated once per frame (O(1));
+            sort of 10 floats runs once every 75 frames (~192 ms) → O(10 log 10) ≈ 33 ops.
+            Negligible on STM32F411 at 100 MHz.
+```
+
+---
+
+### 4.6 Buffer 2 — iFFT/Hilbert Envelope Domain (for Stage 3)
+
+```
+TWO CIRCULAR BUFFERS: B2_mean[], B2_std[], each length W = 750
+Updated only for non-burst frames:
+  B2_mean[i mod W] = env_mean_i
+  B2_std[i mod W]  = env_std_i
+```
+
+**noise_floor estimation — same median-of-local-minima method as Buffer 1:**
+
+```
+Divide B2_mean[] into M = 10 sub-windows of 75 frames each.
+
+n_j = min_{i ∈ S_j} B2_mean[i]    for j = 1, ..., 10
+
+noise_floor(i) = β · median(n_1, ..., n_10)
+```
+
+Same robustness argument as Buffer 1: a single low-energy glitch frame
+affects at most one sub-window minimum and cannot shift the median.
+β = 1.3 same motivation.
+
+**std_noise estimation:**
+
+```
+std_noise(i) = mean_{j ∈ B2_std[]} { B2_std[j] }
+```
+
+Why mean and not median-of-minima for std_noise?
+noise_floor requires the lowest recent background level → minimum-based.
+std_noise represents the *typical variability* of the noise amplitude,
+not its floor. The mean of per-frame stds from confirmed silent frames
+gives the best estimate of this typical variability. A minimum-based
+approach would give the most stationary frame's std, which would
+systematically underestimate the real variability.
+
+```
+RAM:  B2_mean[] buffer:          750 × 4 bytes = 3.0 kB
+      B2_std[] buffer:           750 × 4 bytes = 3.0 kB
+      local minima array (mean): 10  × 4 bytes = 0.04 kB
+      Total Buffer 2:                          = 6.04 kB
+```
+
+---
+
+### 4.7 Initialization (first W frames)
+
+Before the buffer is full, the minimum is unstable (it reflects only a partial window). Strategy:
+
+```
+For the first W/2 = 375 frames:
+  Accept all frames into both buffers without burst protection.
+  Rationale: not enough history to estimate Ê_floor reliably,
+  so burst protection cannot be applied correctly.
+
+From frame W/2 onward:
+  Apply burst protection normally.
+
+Until buffer is full (i < W):
+  Compute min/mean over available entries only.
+```
+
+---
+
+### 4.8 Complete Per-Frame Update Sequence
+
+```
+EVERY FRAME i:
+│
+├─ [1] Compute E_i from FFT magnitudes
+├─ [2] Compute iFFT → Hilbert envelope A[n] → env_mean_i, env_std_i
+│
+├─ [3] Burst check:
+│       if E_i > α · Ê_floor(i-1):
+│           → skip buffer updates  (energetic frame)
+│       else:
+│           B1[i mod W]      = E_i
+│           B2_mean[i mod W] = env_mean_i
+│           B2_std[i mod W]  = env_std_i
+│
+├─ [4] Update estimates:
+│       m_j = min of each of 10 sub-windows of B1
+│       Ê_floor(i)     = β · median(m_1,...,m_10)        → used in Stage 1
+│       n_j = min of each of 10 sub-windows of B2_mean
+│       noise_floor(i) = β · median(n_1,...,n_10)        → used in Stage 3
+│       std_noise(i)   = mean(B2_std)                    → used in Stage 3
+│
+└─ [5] Stage 1 threshold check:
+        if E_i > k · Ê_floor(i):
+            → frame is Stage 1 CANDIDATE → proceed to Stage 2
+        else:
+            → discard frame
+```
+
+---
+
+### 4.9 Constants Summary
+
+| Constant | Value | Motivation |
+|---|---|---|
+| W | 750 frames (~1.92 s) | Tracks floor changes; stable against bursts |
+| M | 10 sub-windows (75 frames each) | Median-of-minima robustness; single outlier cannot shift median |
+| β | 1.3 | Martin (2001) correction — local min underestimates true floor |
+| α | 4 (verify experimentally) | Burst exclusion: E_i > 4× current floor |
+| k | TBD experimentally | Stage 1 threshold multiplier; candidates: 1.5 or 2 |
+
+---
+
+### 4.10 RAM Budget
+
+| Buffer | Size | RAM |
+|---|---|---|
+| B1 (FFT energy) | 750 × float32 | 3.00 kB |
+| B1 local minima | 10 × float32 | 0.04 kB |
+| B2_mean (env mean) | 750 × float32 | 3.00 kB |
+| B2_std (env std) | 750 × float32 | 3.00 kB |
+| B2_mean local minima | 10 × float32 | 0.04 kB |
+| **Total** | | **~9.1 kB** |
+
+Well within the 128 kB SRAM of the STM32F411. On the PC, negligible.
 
 ---
 
@@ -146,7 +336,7 @@ Frame i is a Stage 1 CANDIDATE  iff  E_i > k · Ê_floor(i)
 ```
 
 - **k** is the final threshold multiplier. v4 used k=5 on a static estimate; v5 applies k to the adaptive floor.
-- Suggested starting values: k ∈ {1.5, 2√3 ≈ 3.46}. Choose empirically on outdoor recordings.
+- Suggested starting values: k ∈ {1.5, 2}. Choose empirically on outdoor recordings.
 - The adaptive floor means the threshold automatically rises in noisy environments and falls in quiet ones — no manual recalibration needed per session.
 
 ### 5.2 Run-Length Filter
@@ -165,21 +355,11 @@ Run of length L:
 
 ---
 
-## 6. Stage 2 – FFT Filters (SPR + Normalized Peak)
+## 6. Stage 2 – FFT Parameters
 
-Unchanged from v4 in structure. Both filters operate on the microphone-normalized FFT spectrum.
+Unchanged from v4 in structure. Both filters operate on the microphone-normalized FFT spectrum. Now they are not hard thresholds but are also fed to the SVM.
 
-### 6.1 Filter A – Normalized Peak Amplitude
-
-```
-peak_norm = max_k A_norm[k]    (over 154 bins)
-
-Frame PASSES  iff  peak_norm > min_peak_fft
-```
-
-`min_peak_fft` is a session-adjustable parameter (default 0.85 mV in v4). In v5 this will eventually become a ratio to `noise_floor` for full scale invariance; for now it is kept as an absolute value for continuity.
-
-### 6.2 Filter B – Spectral Peak Ratio (SPR)
+### 6.1. Spectral Peak Ratio (SPR)
 
 ```
 SPR = max_k |A_norm[k]|²  /  mean_k |A_norm[k]|²
@@ -187,7 +367,29 @@ SPR = max_k |A_norm[k]|²  /  mean_k |A_norm[k]|²
 Frame PASSES  iff  SPR ≤ max_spr   (default 20)
 ```
 
-SPR is amplitude-invariant — it rejects tonal/narrowband signals (EMI, oscillators at 40/80 kHz) regardless of their absolute amplitude.
+SPR is amplitude-invariant — it rejects tonal/narrowband signals (EMI, oscillators at 40/80 kHz) regardless of their absolute amplitude. Also, it helps distinguishing flat noise (where SPR is close to 0).
+
+### 6.2 Descriptive Spectral Ratio R
+
+The Stage 2 pass evaluates shape only. In addition, a **descriptive spectral ratio** R is computed for post-hoc analysis:
+
+```
+E_low  = Σ_{k ∈ [51, 102]} |A[k]|²     (20–40 kHz)
+E_high = Σ_{k ∈ [103, 204]} |A[k]|²    (40–80 kHz)
+
+R = E_low / E_high
+```
+
+R provides information about the dominant frequency content of the click (low-frequency clicks → R > 1; high-frequency clicks → R < 1) without affecting the detection decision.
+
+### 6.3 Normalised Dominant Frequency
+
+Corresponds to the frequency where the maximum amplitude is present. It is a descriptive feature.
+
+```
+FPE = `f[argmax(power)]`
+
+```
 
 ---
 
@@ -641,4 +843,4 @@ All features below are fed to the SVM. No hard thresholds in Stage 3.
 ---
 
 *Document maintained by the PlantLeaf project contributors.*
-*Last updated: May 2026 — v5.0 draft*
+*Last updated: June 2026 — v5.0 draft*
