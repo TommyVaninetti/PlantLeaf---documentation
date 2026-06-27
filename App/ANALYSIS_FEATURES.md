@@ -1,729 +1,385 @@
-# 🔬 Analysis Features Guide
+# Analysis Features Guide
 
 ## Overview
 
-PlantLeaf provides advanced post-processing tools for analyzing saved recordings. Analysis features include FFT spectrum visualization, inverse FFT reconstruction, microphone normalization, click detection algorithms, and data export utilities.
+PlantLeaf provides two offline analysis modes for reviewing saved recordings:
+
+- **Audio Replay** (`ReplayWindowAudio`): frame-by-frame FFT inspection, adaptive energy filtering, inverse FFT reconstruction, v5 feature computation, and data collection export for the click detection pipeline.
+- **Voltage Replay** (`ReplayVoltageWindow`): time-domain voltage signal review, region selection, and mathematical curve fitting for plant electrical events.
 
 ---
 
-## Audio Analysis Mode
+## Audio Replay Mode
 
-### 🎯 Purpose
+### Opening a Recording
 
-Analyze saved `.paudio` recordings with frame-by-frame precision, reconstruct time-domain signals from phase data, and characterize ultrasonic click events.
+**Launch methods**:
+- Home window → "Open Audio File" → select a `.paudio` file
+- File menu → Open → choose a `.paudio` file
+- Drag and drop a `.paudio` file onto the application window
 
----
+The window opens maximized (`ReplayWindowAudio`).
 
-## Opening Recordings
+**File validation on load**:
+- Magic bytes must be `PAUDIO`
+- Version must be 3.0 or higher for phase data (iFFT support)
+- A progress dialog shows byte count and estimated remaining time for large files
 
-### 1. Launch Audio Replay Mode
-
-**Methods**:
-- **From Home**: Click "Open Audio File" → Select `.paudio` file
-- **File Menu**: File → Open → Choose `.paudio`
-- **Drag & Drop**: Drag `.paudio` file onto application window (macOS/Windows)
-- **macOS Finder**: Double-click `.paudio` file (if file association configured)
-
-**Window Opens**: `ReplayWindowAudio`
-
-### 2. Loading Progress
-
-**Large Files** (>100 MB):
-- Progress dialog displays
-- Shows: Bytes read / Total size
-- Estimated time remaining
-- Cancel option (aborts load)
-
-**File Validation**:
-- ✅ Check magic bytes: "PAUDIO"
-- ✅ Verify version: 3.0 or compatible
-- ✅ Validate frame count: Positive integer
-- ❌ Error if corrupted: Display diagnostic message
+**After loading**, the application pre-computes normalized FFT energy and adaptive noise floor estimates for every frame using `AdaptiveNoiseEstimatorV5`. This one-time pass enables instant threshold filtering and accurate feature computation throughout the session.
 
 ---
 
-## FFT Spectrum Analysis
+### FFT Spectrum View
 
-### 1. Main Spectrum View
+**Tab**: "FFT Spectrum"
 
-**Default Display**:
-- **X-axis**: Frequency (20-80 kHz)
-- **Y-axis**: Magnitude (Volts, linear scale)
-- **Curve Color**: changes based on the theme selected
-- **Current Frame**: Indicated by slider position
+**Display**:
+- X-axis: Frequency (analysis band, approximately 20–80 kHz)
+- Y-axis: Amplitude (V, linear scale)
+- Normalized mode (default): curve shown in a slightly darker accent color
+- Raw mode: curve shown in the theme's standard accent color
 
-**Controls**:
-- **Frame Slider** (bottom): Navigate through recording
-  - Click-and-drag for scrubbing
-  - Arrow keys for single-frame steps
-  - Home/End keys for first/last frame
-- **Play Button**: Auto-advance through frames (5 FPS default)
-- **Frame Number Box**: Type frame number for direct jump
+**Frame navigation** (toolbar):
+- Frame slider: drag or click-and-drag to scrub through the recording
+- Arrow buttons: step one FFT frame forward or backward (~2.56 ms per step, ~390 FPS resolution)
+- The current frame position is indicated by a vertical dashed line on the time-domain plot
 
-**Info Panel** (right side):
-- **Frame**: Current frame index (0-based)
-- **Timestamp**: Absolute time (MM:SS.mmm)
-- **Peak Frequency**: Bin with maximum amplitude
-- **Peak Magnitude**: Maximum value (V)
-- **Mean Magnitude**: Average across 20-80 kHz
-- **Total Energy**: Sum of squared magnitudes (V²)
-
-### 2. Microphone Normalization
-
-**Purpose**: Correct for non-flat frequency response of SPU0410LR5H-QB microphone on both FFT and iFFT window
-
-**Activation**:
-- **Menu**: Analysis → Normalize FFT Window
-
-**Effect**:
-- **Red Curve**: Normalized spectrum overlays raw curve
-- **Legend**: Shows both curves with labels
-  - "Raw"
-  - "Normalized 50%" (red)
-
-**Technical Details**:
-See [MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md](normalization_feature/MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md) for:
-- Datasheet interpolation method
-- Error analysis (±2.9 dB)
-- Scientific validation
-
-**Toggle Off**:
-- Menu: Analysis → Show Raw FFT Only
-
-### 3. Plot Interaction
-
-**PyQtGraph native controls**:
-- **Zoom**: Mouse wheel or right-click drag
-- **Pan**: Left-click drag
-- **Auto-range**: Press 'A'
+**Normalization toggle**: Analysis menu → "Toggle Normalized/Raw" applies or removes the 50% SPU0410LR5H-QB microphone correction. The FFT and time-domain plots switch simultaneously; the iFFT window has its own independent toggle.
 
 ---
 
-## Inverse FFT (iFFT) Reconstruction
+### Time-Domain Energy View
 
-### 🎯 Purpose
+**Tab**: "Time Domain"
 
-Reconstruct time-domain signal from FFT magnitude + phase data to achieve **sub-frame temporal resolution** (5 μs vs. 2.56 ms frame duration).
+This plot shows the per-frame FFT energy [V²] over time, not a reconstructed waveform. Three layers are drawn simultaneously:
 
-### 1. Open iFFT Window
+| Layer | Color | Meaning |
+|-------|-------|---------|
+| Main curve | Theme accent / blue | FFT energy per frame (normalized or raw, follows the normalization toggle) |
+| Threshold curve (dashed red) | Red dashed | k × Ê_floor(i) — Stage 1 pass criterion at each frame |
+| Noise floor curve | Cyan | Ê_floor(i) — raw adaptive noise estimate without multiplier |
 
-**Action**: Analysis → iFFT Graph (or press `Cmd+I`)
+The adaptive threshold and noise floor are pre-computed at load time and rendered without further cost.
 
-**Requirements**:
-- ✅ File version ≥ 3.0 (phase data included)
-- ❌ Version < 3.0: Error dialog "No phase data available"
+**Playback**: speed range 0.1× to 1.0× of real recording speed. During playback, the view scrolls a 20-second window around the current position.
 
-**Window Layout**:
-- **Top Panel**: FFT spectrum (current frame)
-- **Bottom Panel**: iFFT time-domain waveform (512 samples, 2.56 ms)
+---
 
-### 4. Windowing Options
+### Stage 1 Threshold Filter
 
-**Problem**: Abrupt spectral edges (bins 51, 204) cause Gibbs artifacts (ringing)
+The right panel contains two tabs:
 
-**Solution**: Apply Tukey window (10% taper) to complex spectrum
+**"Recorded Events"** — click events embedded in the `.paudio` file at acquisition time (stored by the firmware during live recording). Columns: Timestamp, Frequency, Amplitude, Duration (FFT frames), Notes. Double-click a row to jump to that timestamp.
 
-**Controls**:
-- **Checkbox**: "Apply Tukey Window (10% taper)"
-  - ✅ Checked (default): Smooth edges, minimal ringing
-  - ❌ Unchecked: Raw spectrum, visible Gibbs artifacts
+**"Above Threshold"** — live re-filtering of the loaded recording against the current k value. Consecutive frames whose normalized FFT energy exceeds k × Ê_floor are grouped (maximum 5-frame gap) and listed. Columns: Timestamp, Frequency, Amplitude (mV), Duration (FFT frames), Notes (SNR ratio at peak frame).
 
-**Visual Comparison**:
-- **With Window**: Clean start/end of waveform
-- **Without Window**: ~9% overshoot, decaying oscillations
+**k spinbox** ("Stage 1 threshold multiplier k"): range 0.5–20.0, step 0.5, default 1.5. Lower k casts a wider net; higher k reduces false positives. Press "Apply" or change the spinbox value to rebuild the table. The threshold curve on the time-domain plot updates automatically when k changes.
 
-**Technical Explanation**:
-See [FFT_PHASE_TECHNICAL_SPECIFICATION.md](FFT_and_acquisition_specifications/FFT_PHASE_TECHNICAL_SPECIFICATION.md), Section 7
+This filter exposes Stage 1 of the v5 click detection pipeline interactively. See [CLICK_DETECTION_ALGORITHM_v5.md](Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v5.md) for the full pipeline (Stages 1–4) and the offline SVM classifier.
 
-### 5. Normalization in iFFT
+---
 
-**Purpose**: Apply 50% microphone correction to time-domain signal
+### Microphone Normalization
 
-**Activation**: Click **"Apply 50% Normalization"** button
+**Correction**: 50% conservative correction based on the SPU0410LR5H-QB frequency response datasheet.
 
+**Estimated error**: ±2.9 dB (95% confidence). See [MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md](MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md) for the interpolation method and full error analysis.
 
-**Toggle Back**: Click **"Show Raw iFFT"** button
+**When enabled (default)**:
+- The FFT curve switches to the darker accent color
+- The time-domain energy plot and threshold curve both use normalized energy values
+- The iFFT window applies normalization when opened (can be toggled independently in that window)
 
-**Important Note**:
-- Normalization applied to **complex spectrum** before iFFT
-- Not a simple amplitude scaling of time signal
-- Preserves phase relationships
+**Note**: SPR, R_spectral, and FPE are always computed on normalized data regardless of the display toggle — this matches the SVM training inputs exactly. Analysis menu → "FFT Parameters" shows these three values for the current frame in a dialog.
 
-### 6. Envelope Analysis
+---
 
-**Hilbert Envelope**:
-- **Button**: "Show Hilbert Envelope" in iFFT window
-- **Method**: Scipy `hilbert()` transform to compute instantaneous amplitude
-- **Display**: Red thick line overlaid on iFFT waveform
-- **Toggle**: Click button again to hide envelope
+## Inverse FFT (iFFT) Window
 
-**Decay Analysis**:
-- **Button**: "Analyze Decay" in iFFT window
-- **Method**: Logarithmic fit of envelope decay over a 0.6 ms post-peak window (120 samples at 200 kHz)
-- **Output**: Decay time constant τ (ms) and R² of fit
-- **Purpose**: Confirm exponential decay typical of genuine ultrasonic clicks
+### Opening the Window
+
+**Action**: toolbar button or Analysis menu → "iFFT Graph" (`Ctrl+I`)
+
+**Requirements**: file version ≥ 3.0 with real phase data. If phase data is absent, the button is disabled. The window title shows `[Real Phases]` or `[Zero Phases]` accordingly.
+
+The window opens following the main window normalization state: if normalized mode is active, the normalized signal is displayed by default.
+
+The iFFT reconstruction uses `reconstruct_frame_v5`, which applies a Tukey taper internally to suppress Gibbs artifacts at the spectral band edges. This is always active — there is no user-facing toggle for it.
+
+---
+
+### Normalization Toggle
+
+**Button**: "Apply 50% Normalization" / "Show Raw iFFT"
+
+Reconstructs the iFFT with or without the 50% microphone correction, using the same `reconstruct_frame_v5` pipeline as the click detector. The normalized signal is shown in a darker accent color (default); the raw signal uses the standard accent color.
+
+---
+
+### Hilbert Envelope
+
+**Button**: "Show Hilbert Envelope" / "Hide Hilbert Envelope"
+
+Computes the instantaneous amplitude envelope from `scipy.signal.hilbert` on the current signal (raw or normalized) and overlays:
+- Hilbert envelope: red thick line
+- Peak marker: yellow dashed vertical line at the sample of maximum envelope amplitude
+
+The peak is located on the envelope rather than on the oscillating signal, which avoids misidentifying a zero-crossing as the peak.
+
+---
+
+### Decay Analysis (v5 Features)
+
+**Button**: "Analyze Decay"
+
+Runs `compute_features_v5()` for this frame, fetching per-frame noise estimates from `AudioDataManager` and the adjacent frame envelopes for `pre_SNR` and `post_SNR`. A scrollable dialog shows all 17 v5 features alongside physically motivated expected ranges:
+
+| # | Feature | Expected range (genuine click) |
+|---|---------|-------------------------------|
+| 1 | peak_SNR | >> 1 (typically 10–1000+) |
+| 2 | pre_SNR | ≈ 1.0 (silence before click) |
+| 3 | post_SNR | ≈ 1.0 (return to silence) |
+| 4 | rise_time_ms | 0.025–0.3 ms |
+| 5 | fall_time_ms | > rise_time |
+| 6 | asymmetry_integral | positive (decay > rise) |
+| 7 | ZCR_pre | low (silence before) |
+| 8 | ZCR_click | oscillation rate during click |
+| 9 | ZCR_post | decreasing during decay |
+| 10 | kurtosis | 15–50 (impulsive event) |
+| 11 | centroid_shift_hz | > 2–5 kHz (high frequencies decay first) |
+| 12 | tau_ms | 0.05–1.3 ms (cavitation) |
+| 13 | R² | ≥ 0.45 (exponential fit quality) |
+| 14 | fit_coverage | 0.7–1.0 (fraction of decay window used) |
+| 15 | SPR | ≤ 20 (broadband, not tonal) |
+| 16 | R_spectral | descriptive — E[20–40 kHz] / E[40–80 kHz] |
+| 17 | FPE_hz | dominant frequency in the analysis band |
+
+These ranges are guidance only. No hard thresholds are applied in the iFFT window — all 17 features are passed to the SVM for the final decision. `fit_coverage` is excluded from the SVM input and shown for diagnostic purposes only.
+
+---
+
+### Fit Curve Overlay
+
+**Button**: "Show Fit Curve" (enabled after "Analyze Decay" has been run)
+
+Overlays on the iFFT plot:
+
+- Exponential fit A₀ · exp(−t/τ) over the identified decay window, color-coded by R²:
+  - R² ≥ 0.70: green
+  - R² ≥ 0.45: orange
+  - R² < 0.45: red
+- Yellow dotted vertical line at the peak sample
+- Cyan dashed horizontal line at `noise_floor`
+- Purple dotted horizontal line at `noise_floor + std_noise`
+
+---
+
+### Show Only Envelope
+
+**Button**: "Show Only Envelope" / "Show iFFT Signal"
+
+Hides or restores the raw iFFT trace to let the Hilbert envelope be inspected without the carrier oscillation.
 
 ---
 
 ## Click Detection Algorithm
 
-### 🎯 Purpose
+The v5 pipeline (Stages 1–4) runs in real-time during acquisition and can be re-applied offline via the data collection export. The threshold filter in the replay window exposes Stage 1 interactively.
 
-Automatically identify frames containing ultrasonic clicks based on a **4-stage pipeline** algorithm (v4.0). The pipeline progressively filters the ~1.4 million frames of a one-hour recording down to a few dozen confirmed click events with high sensitivity and very low false-positive rate.
+For the complete algorithm specification — including Stage 2 hard gates (R² ≥ 0.10, SPR < 100), Stage 3 SVM classifier, Stage 4 deduplication, all 17 feature definitions, training protocol, and evaluation results — see:
 
-### 1. Open Click Detector Dialog
+**[CLICK_DETECTION_ALGORITHM_v5.md](Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v5.md)**
 
-**Action**: Analysis → 🔍 Automatic Click Detector... (or `Ctrl+D`)
+---
 
-**Window**: `ClickDetectorDialog`
+## Data Collection Export
 
-**File Info panel** (auto-populated from recording):
-- Total duration (s)
-- Total frames
-- Mean energy μ (mV)
-- Std deviation σ (mV)
-- Estimated noise floor (µV, from offline estimation)
+**Action**: File menu → "Export Data Collection" (audio replay only)
 
-### 2. Detection Pipeline
+**Purpose**: exports Stage 1 survivors from one or more `.paudio` files as a labeled CSV and two-panel screenshots, ready for manual labeling and SVM training.
 
-The algorithm runs 4 sequential stages. A frame must pass **every** stage to be confirmed as a click.
+**Dialog** (`DataCollectionDialogV5`):
+- Select `.paudio` files from a folder
+- Set the Stage 1 multiplier k (default 1.5 — intentionally wide to avoid missing any click)
+- Run export: for each candidate, all 17 v5 features and noise estimates are computed and written
 
-```
-[Stage 1]  Energy threshold  →  discard silent frames  (E > μ + k·σ)
-[Stage 2]  SPR filter        →  discard tonal/narrowband noise  (SPR ≤ max_spr)
-[Stage 3]  Six-criterion validation  →  ALL SIX must pass
-[Stage 4]  Deduplication     →  merge consecutive frames, keep strongest
-```
+**CSV schema** (one row per Stage 1 candidate):
 
-#### Stage 1: Energy Threshold
-
-- **Parameter**: Energy threshold spinbox (units: mV)
-- **Default**: μ + 4σ (auto-calculated from the loaded file)
-- **Step size**: 1σ (spinbox step adapts to the file's noise floor)
-- **Logic**: Frames with mean FFT amplitude above threshold are **candidates**
-- **Typical reduction**: eliminates 98–99% of frames
-
-#### Stage 2: Spectral Peak Ratio (SPR) Filter
-
-- **Formula**: `SPR = max(|X[k]|²) / mean(|X[k]|²)` computed over all 154 bins (20–80 kHz)
-- **Default threshold**: `max_spr = 20`
-- **Logic**: broadband clicks (energy spread across many bins) have low SPR; tonal interference (fans, EMI, sine tones) concentrates energy in 1–3 bins → high SPR → **rejected**
-- **Key property**: amplitude-invariant — depends only on spectral *shape*, not signal level
-- **Also computed (descriptive only)**: `R = E_low / E_high` (spectral balance between 20–40 kHz and 40–80 kHz sub-bands), saved per click but not used as a filter
-
-#### Stage 3: Six-Criterion Validation (v4.0)
-
-Candidate frames must pass **all six criteria**. These are evaluated on the iFFT-reconstructed, Gibbs-suppressed time-domain signal and its Hilbert envelope.
-
-| # | Criterion | Parameter | Default | Description |
-|---|-----------|-----------|---------|-------------|
-| C1 | **Peak iFFT amplitude** | Min. peak iFFT | 130 µV | Absolute peak of time-domain signal must clear minimum threshold |
-| C2 | **Silence before click** (pre_snr) | Max. pre_snr | 1.7 | `RMS(pre_window) / noise_rms` — confirms transient onset from silence |
-| C3 | **Global energy decay** | Min. E_W1/E_W4 ratio | 2.0 | First sub-window energy must be ≥ 2× last sub-window energy |
-| C4 | **Spike asymmetry** | Max. asym ratio | 2.5 | `rise_samples / fall_samples` — rejects short symmetric electrical spikes |
-| C5 | **Physical decay time** (τ) | τ range | [0.045, 1.3] ms | Exponential decay constant must match cavitation physics |
-| C6 | **Decay quality** (R²) | Min. R² | 0.45 | Log-linear fit of Hilbert envelope must confirm exponential decay |
-
-**Noise estimation**: Before Stage 1, an offline estimator scans up to 500 silent frames (seed = 42, reproducible) and computes `noise_rms` as the mean RMS of their iFFT signals. This value is used by C1 and C2.
-
-#### Stage 4: Deduplication
-
-- Groups detections with gap ≤ 4 consecutive frames (~10 ms)
-- Within each group, keeps the frame with the highest peak amplitude
-- Prevents the same physical click from being counted multiple times when it overlaps two consecutive frames
-
-**📖 Full mathematical documentation**: [CLICK_DETECTION_ALGORITHM_v4.md](autoclick/CLICK_DETECTION_ALGORITHM_v4.md)
-
-### 3. Configurable Parameters
-
-| Parameter | Default | Effect if increased | Effect if decreased |
-|-----------|---------|---------------------|---------------------|
-| Energy threshold (k·σ) | μ + 4σ | Fewer Stage 1 candidates, faster | More candidates, more false positives |
-| Max SPR | 20 | Accepts more tonal signals | Rejects more narrowband noise |
-| Min peak iFFT (C1) | 130 µV | Requires stronger clicks | Catches weaker clicks, more noise |
-| Max pre_snr (C2) | 1.7 | Tolerates more background noise pre-click | Requires stricter silence |
-| Min E_W1/E_W4 (C3) | 2.0 | Requires stronger decay gradient | Accepts slower-decaying events |
-| Max asymmetry (C4) | 2.5 | More tolerant of spike-like shapes | More aggressive spike rejection |
-| τ min / τ max (C5) | 0.045 / 1.3 ms | Wider physical window | Narrower physical window |
-| Min R² (C6) | 0.45 | Requires cleaner exponential decay | Accepts noisier decay shapes |
-
-### 4. Run Detection
-
-**Action**: Click **"▶ Run Detection"** button
-
-**Process**:
-1. Offline noise estimation from empty frames
-2. Stage 1 candidate selection (energy threshold)
-3. Stage 2 SPR broadband filter + R spectral ratio (descriptive)
-4. Stage 3 six-criterion validation (iFFT + Hilbert envelope)
-5. Stage 4 deduplication
-6. Results table populated
-
-### 5. Results Table
-
-**Columns**:
 | Column | Description |
 |--------|-------------|
-| Timestamp | Absolute time (s) |
-| Peak iFFT | Peak time-domain amplitude (µV) — C1 |
-| pre_snr | Silence-before-click ratio — C2 |
-| E_W1/E_W4 | Energy decay ratio across sub-windows — C3 |
-| Asymmetry | Rise/fall ratio — C4 |
-| τ (ms) | Exponential decay constant — C5 |
-| R² (log) | Quality of exponential fit — C6 |
-| SPR | Spectral Peak Ratio (Stage 2 filter value) |
-| Ratio R | E_low / E_high spectral balance (descriptive) |
-| Verdict | ✅ WOULD PASS SCAN / ❌ WOULD FAIL SCAN |
-| Notes | Failed criteria, near-end flag, etc. |
+| file | `.paudio` filename |
+| frame_idx | Frame index (0-based) |
+| timestamp_s | Absolute time (s) |
+| noise_floor_uV | Adaptive noise floor at this frame (µV) |
+| std_noise_uV | Noise standard deviation (µV) |
+| E_hat_floor | Ê_floor energy threshold (V²) |
+| peak_SNR … FPE_hz | 17 v5 features |
+| label | Fill manually: 1 = click, 0 = noise, empty = unknown |
 
-**Navigation**: Double-click a row to jump to that frame in the main window.
-
-### 6. iFFT Window Integration
-
-When a detected click is selected and the iFFT window is open, the **"Analyze Decay"** button runs the full v4.0 validation on the current frame and shows:
-- All six criterion results (pass/fail with measured values)
-- Final verdict: **✅ WOULD PASS SCAN** or **❌ WOULD FAIL SCAN**
-- Descriptive features: τ, R², slope, sub-window energies
-
-### 7. Export Results
-
-**Action**: Click **"Export Results..."** button (enabled after detection)
-
-**Format**: CSV with all table columns (one row per confirmed click)
-
-
-For more details about the algorithm developed, check **[CLICK_DETECTION_ALGORITHM_MATHEMATICAL_FRAMEWORK.md](Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM.md)**
+**Screenshots**: two-panel PNG per candidate (FFT spectrum + iFFT waveform with feature table), rendered with QPainter without opening display windows.
 
 ---
 
-## Data Export
+## Data Export — Trimmed Region
 
-### 1. Export Trimmed Region (Audio & Voltage)
+**Action**: File menu → "Export Trimmed Region..." (`Ctrl+T`)
 
-**Action**: File → Export Trimmed Region... (or `Ctrl+T`)
-
-**Purpose**: Save a selected time sub-range of the recording as a new `.paudio` or `.pvoltage` file.
+Available in both audio and voltage replay windows.
 
 **Workflow**:
-1. Open a recording
-2. File → Export Trimmed Region...
-3. Select start/end time in the dialog
-4. Choose output file name
-5. Trimmed file is written with a proper header (preserving sampling rate, metadata)
+1. File → Export Trimmed Region...
+2. Select start and end time in the dialog
+3. Choose output file name
+
+The trimmed file is written with a valid header preserving the sampling rate and all metadata. For voltage files, saved analyses within the selected time range have their timestamps adjusted to the new time origin.
 
 ---
 
-## Voltage Analysis Mode
+## Voltage Replay Mode
 
-### 🎯 Purpose
+### Opening a Recording
 
-Analyze saved `.pvoltage` recordings with statistical tools, event detection, and **automated mathematical fitting** for plant electrical signals (action potentials and exponential relaxation events).
+Same methods as audio, but selecting a `.pvoltage` file. Opens `ReplayVoltageWindow`.
 
-### 1. Open Voltage Recording
+**File format**: magic bytes `PLANTVOLT`, versions 1.0 and 2.0. The header flag `amplified` determines Y-axis scaling:
+- Amplified recording: ±1.7 V
+- Non-amplified: ±130 mV
 
-**Same as Audio** (see section above), but select `.pvoltage` file
+Large files are loaded in 100,000-sample chunks with a progress dialog.
 
-**Window Opens**: `ReplayVoltageWindow`
+---
 
-### 2. Main Voltage Plot
+### Main Voltage Plot
 
-**Display**:
-- **X-axis**: Time (seconds)
-- **Y-axis**: Voltage (mV or V, depending on whether the amplifier was used during acquisition)
-- **Curve**: Single trace (full recording visible at rest)
+**Display**: single time-domain trace showing the full recording at rest. On playback, the view scrolls a 15-second window centered on the current position.
 
 **Playback controls** (toolbar):
-- **Play / Pause**: Scroll through the recording in real time
-- **Stop**: Returns to full-recording view (position reset to 0)
-- **Speed**: Playback speed multiplier
+- Play / Pause: scroll through the recording in real time
+- Stop: reset to position 0 and restore the full-recording view
+- Speed: playback speed multiplier
 
-**Time slider**: Drag to jump to any position in the recording.
-
-### 3. Export Voltage Data
-
-**Trimmed Region Export**:
-- File → Export Trimmed Region... (`Ctrl+T`)
-- Select start/end time → saves a new `.pvoltage` file
+**Time slider**: drag to jump to any position.
 
 ---
 
-## 📐 Mathematical Analysis & Automatic Fitting
+### Mathematical Analysis and Curve Fitting
 
-### 🎯 Purpose
-
-The **Mathematical Analysis module** (`MathOperations` dialog) provides **automated parameter extraction and curve fitting** for plant electrical signals. It automatically classifies the signal type and fits a physiologically motivated mathematical model, extracting quantitative parameters for scientific comparison.
+**Purpose**: automated parameter extraction and model fitting for plant electrical signals.
 
 **Activation**:
-1. In `ReplayVoltageWindow`, click **Analysis → Select Region for Analysis** — the cursor enters region-selection mode
-2. Click and drag on the voltage plot to define the time region of interest
-3. Once a region is selected, click **Analysis → Analyze Region** to open the `MathOperations` dialog
+1. Analysis menu → "Select Region for Analysis" — a movable 5-second selection region appears centered on the current view. Click again to remove it.
+2. Drag the region boundaries to frame the event (maximum 30 seconds)
+3. Double-click the region, or Analysis menu → "Analyze Region" — opens the `MathOperations` dialog
 
----
+During playback, region selection is disabled and the action button is grayed out.
 
-### Signal Type Auto-Detection
+#### Signal Type Auto-Detection
 
-The algorithm automatically classifies the selected signal as one of two types:
+**Exponential Return** (variation potential / slow relaxation): single dominant peak, monotonic return to baseline, no significant opposite rebound. Detection criterion: rebound amplitude < 30% of main peak amplitude.
 
-#### A. Exponential Return (Variation Potential / Slow Relaxation)
-**Biological meaning**: Slow membrane depolarization or repolarization after a stimulus, typical of variation potentials or wound-induced responses.
+**Action Potential**: main peak followed by a rebound in the opposite direction (≥ 30% of main peak), rebound occurring after the main peak, time between peaks < 2.0 s, both peaks above 3σ of baseline noise.
 
-**Detection criteria**:
-- Single dominant peak (either upward or downward)
-- No significant counter-oscillation (rebound ratio < 30% of main amplitude)
-- Monotonic decay/rise toward baseline after peak
+#### Mathematical Models
 
-#### B. Action Potential
-**Biological meaning**: Fast oscillatory membrane event characteristic of true action potentials in excitable plant cells (e.g., Mimosa, Venus flytrap).
-
-**Detection criteria**:
-- Main peak followed by a **significant rebound in opposite direction** (rebound ratio ≥ 30%)
-- Peaks in correct temporal order (rebound comes after main peak)
-- Time between peaks < 2.0 seconds
-- Both peaks exceed 3σ above baseline noise
-
-**Decision logic** (simplified):
-```
-if (rebound_amplitude > 30% of main_amplitude)
-   AND (rebound occurs AFTER main peak)
-   AND (time_between_peaks < 2.0 s):
-   → Action Potential
-else:
-   → Exponential Return
-```
-
----
-
-### Baseline Estimation
-
-**Method**: Mean of a pre-event window (~1 second before the selected region)
-
-```
-V_baseline = mean(V[pre-event window])
-σ_baseline = std(V[pre-event window])
-```
-
-**Purpose**:
-- Zero-reference for amplitude measurements
-- Noise threshold (3σ criterion for detection)
-- Fitting parameter `Vb` (asymptote of exponential)
-
-**Pre-event window selection**:
-- If ≥ 1s of data precedes the selection: uses last 50 samples of that second
-- If < 1s available: uses first 50 samples of the selection
-- Edge case (< 50 samples total): uses first 1/3 of available data
-
----
-
-### Mathematical Models
-
-#### Model 1: Exponential Return
-
-Fitted to the **decay phase** (from peak onwards):
-
+**Exponential Return**:
 ```
 V(t) = A · exp(-(t - t₀) / τ) + V_baseline
 ```
+Fitted over the decay phase (from peak onwards). Parameters: A (amplitude relative to baseline), t₀ (peak time), τ (time constant), V_baseline (resting potential).
 
-| Parameter | Symbol | Physical Meaning |
-|-----------|--------|-----------------|
-| Amplitude | A | Peak voltage relative to baseline (V) |
-| Time origin | t₀ | Time of peak (s) |
-| Time constant | τ | Characteristic decay time (s) |
-| Baseline | V_baseline | Resting membrane potential (V) |
-
-**Initial parameter estimation** (before `curve_fit`):
-- `A` = `V_peak - V_baseline`
-- `τ` = time for signal to reach `V_baseline + 0.632 × |A|` after peak (63.2% criterion, i.e., one time constant)
-- `t₀` = time of peak
-- `V_baseline` = pre-event mean
-
-**Fitting domain**: Only samples **from t₀ onwards** (peak to end of event), to avoid distortion from the rising phase which follows a different kinetics.
-
----
-
-#### Model 2: Action Potential (Composite Model)
-
-A **piecewise function** combining a sinusoidal depolarization phase and an exponential repolarization phase:
-
+**Action Potential** (piecewise composite):
 ```
          ⎧ A_sin · sin(2π · f · (t - t₀) + φ)           for t < t_peak
 V(t) =  ⎨
          ⎩ A_exp · exp(-(t - t_peak) / τ) + V_baseline   for t ≥ t_peak
 ```
+Parameters: A_sin, f, φ (depolarization oscillation); A_exp, τ (repolarization exponential); V_baseline.
 
-| Parameter | Symbol | Physical Meaning |
-|-----------|--------|-----------------|
-| Sine amplitude | A_sin | Half-amplitude of depolarization oscillation (V) |
-| Oscillation frequency | f | Characteristic frequency of the depolarization (Hz) |
-| Phase | φ | Phase offset of the sine wave (rad), default ≈ 5° |
-| Exp. amplitude | A_exp | Amplitude of repolarization exponential (V) |
-| Peak time | t_peak | Time of peak / transition between phases (s) |
-| Time constant | τ | Repolarization time constant (s) |
-| Baseline | V_baseline | Resting membrane potential (V) |
+#### Baseline Estimation
 
-**Physical interpretation**:
-- **Sine phase** (t < t_peak): Models the oscillatory depolarization event (fast voltage change)
-- **Exponential phase** (t ≥ t_peak): Models the membrane repolarization back to resting potential
+Mean of a pre-event window: last 50 samples of the 1 second preceding the selected region. If less than 1 second is available, the first 50 samples of the selection are used instead.
 
-**Initial parameter estimation**:
-- `A_sin` = `(V_first_peak - V_second_peak) / 2`
-- `f` estimated from zero-crossing time after main peak
-- `A_exp` = `V_peak - V_baseline`
-- `τ` = time to reach `V_baseline - 0.632 × |A_exp|` (63.2% criterion)
+#### Fitting Engine
 
----
+`scipy.optimize.curve_fit` (Levenberg–Marquardt / Trust Region Reflective), maximum 10,000 function evaluations. Initial parameters are estimated analytically from signal shape before optimization (τ from the 63.2% criterion, f from zero-crossing timing). Parameter bounds are derived dynamically from the signal amplitude range.
 
-### Curve Fitting Engine
+#### Goodness of Fit
 
-**Library**: `scipy.optimize.curve_fit` (Levenberg-Marquardt / Trust Region Reflective)
-
-**Strategy**: Two-step approach:
-1. **Auto-detect** initial parameters from signal shape (see above)
-2. **Bounded optimization** with physically motivated parameter bounds
-
-**Bounds** (exponential return example):
-```python
-# Bounds derived dynamically from signal range
-V_span = V_max - V_min
-bounds = (
-    [-1.2 * V_span,          # A_min
-     t_peak - 0.5,           # t0_min
-     0.0001,                  # tau_min (0.1 ms)
-     V_min - V_span],        # Vb_min
-    [+1.2 * V_span,          # A_max
-     t_peak + 0.5,           # t0_max
-     signal_duration,         # tau_max
-     V_max + V_span]         # Vb_max
-)
-```
-
-**Convergence**: Max 10,000 function evaluations
-
----
-
-### Goodness-of-Fit: R² Coefficient
-
-**Formula**:
 ```
 R² = 1 - SS_res / SS_tot
-
-where:
-  SS_res = Σ(V_measured - V_fitted)²    (residual sum of squares)
-  SS_tot = Σ(V_measured - V_mean)²      (total sum of squares)
 ```
+| R² | Quality |
+|----|---------|
+| 0.99–1.00 | Excellent |
+| 0.95–0.99 | Good |
+| 0.85–0.95 | Acceptable |
+| < 0.85 | Poor — review parameters or region |
+| < 0 | Model worse than flat line (warning shown automatically) |
 
-**Interpretation**:
-| R² Value | Quality |
-|----------|---------|
-| 0.99 - 1.00 | Excellent fit |
-| 0.95 - 0.99 | Good fit |
-| 0.85 - 0.95 | Acceptable |
-| < 0.85 | Poor fit, review parameters |
-| < 0 | Model worse than flat line (auto-warning) |
+#### Signal Energy
 
-**Automated warning**: If R² < 0, a dialog prompts the user to review signal type selection, time range, or initial parameters.
+Trapezoidal numerical integration of (V(t) − V_baseline)² over the fitted region. Units: V²·s (proportional to energy dissipated per unit resistance).
+
+#### Manual Parameter Adjustment
+
+All fitted parameters can be adjusted via spinboxes after auto-fitting. The curve, R², and energy update in real time. "Auto-Fit" re-runs `curve_fit` using the current spinbox values as the initial guess.
 
 ---
 
-### Signal Energy (Numerical Integration)
+### Saving and Exporting Analyses
 
-The dialog computes the **electrical energy** of the event above baseline using the trapezoidal rule:
+**Save**: appends the analysis as a JSON record in the footer of the `.pvoltage` file without overwriting any signal data. Stores model type, all fitted parameters, R², energy, time range, name, and save timestamp. Multiple analyses per file are supported, each identified by a UUID.
 
-```
-E = ∫ (V(t) - V_baseline)² dt  ≈  Σ [(V[i] - V_b)² + (V[i+1] - V_b)²] / 2 × Δt
-```
+**Open Saved Analysis**: Analysis menu → "Open Saved Analysis" lists all saved analyses for the current file. Select one to reopen the `MathOperations` dialog pre-filled with saved parameters. Analyses can be deleted from this dialog (permanent, with confirmation prompt).
 
-**Units**: V²·s (proportional to energy dissipated per unit resistance)
-
-**Reported value**: Total energy over the fitted region.
-
----
-
-### Manual Parameter Adjustment
-
-After auto-fitting, users can **manually fine-tune** all parameters via spinboxes:
-
-**Real-time update**: Modifying any spinbox instantly recalculates:
-1. The fitted curve
-2. The R² coefficient
-3. The energy integral
-4. The displayed formula
-
-**Controls available**:
-
-*Exponential Return*:
-- `A` (amplitude): Slider + spinbox, range ±2× signal span
-- `τ` (tau): Slider + spinbox, range 0.1 ms to 10 s
-- **Direction toggle**: Upward / Downward (inverts amplitude sign)
-
-*Action Potential*:
-- `A_sin`, `f`, `φ` (sine component)
-- `A_exp`, `τ` (exponential component)
-- **Direction toggle**: Upward / Downward
-- **Signal type selector**: Switch between Exponential Return and Action Potential
-
-**Auto-Fit button**: Re-runs `curve_fit` with current spinbox values as initial guess.
-
----
-
-### General Variables Panel
-
-A separate display shows auto-detected event properties regardless of model:
-
-| Variable | Description |
-|----------|-------------|
-| V_baseline | Mean baseline voltage (V) |
-| V_max | Maximum voltage in event (V) |
-| V_min | Minimum voltage in event (V) |
-| t_start | Event start time (s) |
-| t_end | Event end time (s) |
-| t_peak | Time of peak voltage (s) |
-| Direction | Upward / Downward |
-
-These values are also editable for manual correction, and draggable reference lines appear on the plot for visual confirmation.
-
----
-
-### Saving & Exporting Analysis Results
-
-**Save Analysis** (button: "Save"):
-- Appends the analysis as a JSON record in a footer at the end of the `.pvoltage` file (no data is overwritten)
-- Stores: analysis name, model type, all fitted parameters, R², energy, time range, and timestamp
-- Multiple analyses can be saved per file (different time regions), each identified by a UUID
-
-**Re-open a saved analysis**:
-- Analysis → Open Saved Analysis
-- A dialog lists all saved analyses with name and save date
-- Select one and click OK to re-open the `MathOperations` dialog pre-filled with saved parameters
-- Analyses can also be deleted from this dialog (permanent, with confirmation prompt)
-
-**Export to CSV** (button: "Export CSV"):
-```csv
-Time_s, Voltage_V, Fitted_V, Residual_V
-12.000, 1.6523, 1.6488, 0.0035
-12.001, 1.6721, 1.6695, 0.0026
-...
-```
-
-**Report Summary** (shown in dialog):
-```
-=== Analysis Report ===
-Signal Type: Action Potential
-Direction: Upward
-V_baseline: 1.648 V
-V_peak: 1.892 V
-Peak time: 12.234 s
-Duration: 1.45 s
-
-Fitted Parameters:
-  A_sin = 0.142 V    f = 2.31 Hz    φ = 0.087 rad
-  A_exp = 0.183 V    τ = 0.312 s    Vb = 1.648 V
-
-Goodness of Fit:
-  R² = 0.9723
-
-Signal Energy (above baseline):
-  Total:  8.42 × 10⁻⁴ V²·s
-```
-
-**For publications**: Cite fitted parameters (A, τ, R²) as quantitative descriptors of the response, comparable across experiments and species.
+**Export to CSV**: exports one row per sample in the fitted region with columns: Time_s, Voltage_V, Fitted_V, Residual_V.
 
 ---
 
 ## Troubleshooting
 
-### Issue: iFFT Window Shows Noise
+**iFFT window shows noise, not a waveform**: the frame has no signal above background, or the file lacks phase data (version < 3.0). Navigate to a frame with a visible FFT peak before opening the iFFT window.
 
-**Symptoms**: Time-domain signal looks like random noise, no clear waveform
+**No candidates in the Above-Threshold table**: lower k toward 0.5. If the table is still empty, the recording may contain no frames above the adaptive noise floor estimate.
 
-**Causes**:
-1. No phase data (file version < 3.0)
-2. Phase data corrupted
-3. Selected frame has no signal (background noise)
+**Normalization makes the FFT spectrum look wrong**: the 50% correction is calibrated only for the SPU0410LR5H-QB microphone. Use raw mode if a different transducer was used.
 
-**Solutions**:
-1. Check file version displayed in the window title
-2. Navigate to a frame with a known click (high FFT amplitude)
-3. If "Zero Phases" is shown in the title, the file lacks phase data and iFFT will not be meaningful
-
-### Issue: Click Detection Finds Nothing
-
-**Symptoms**: "0 clicks detected" despite visible events
-
-**Causes**:
-1. Threshold too high (μ + Nσ too large for the recording)
-2. SNR criterion too strict
-
-**Solutions**:
-1. Lower threshold spinbox value by one or more σ steps
-2. Reduce Min. SNR below 5.0
-
-### Issue: Normalization Makes Spectrum Look Wrong
-
-**Symptoms**: Normalized curve is strange or noisier
-
-**Causes**:
-1. Microphone model mismatch (correction only valid for SPU0410LR5H-QB)
-2. Very low SNR (noise gets amplified by the correction)
-
-**Solutions**:
-1. Verify microphone model: correction is based on SPU0410LR5H-QB datasheet only
-2. If SNR is very low, use raw spectrum instead
-
-### Issue: MathOperations Fit Does Not Converge
-
-**Symptoms**: Fitted curve does not match signal, R² is very low or negative
-
-**Solutions**:
-1. Check that the selected region contains a single clean event (no multiple overlapping signals)
-2. Try switching signal type (Exponential Return ↔ Action Potential)
-3. Manually adjust initial parameters via spinboxes before clicking "Auto-Fit"
-4. If R² < 0, a warning dialog is shown automatically
+**MathOperations fit does not converge**:
+1. Check that the selected region contains a single clean event.
+2. Try switching signal type (Exponential Return ↔ Action Potential).
+3. Manually adjust initial parameters before clicking "Auto-Fit".
+4. Narrow or widen the region to better isolate the event.
 
 ---
 
 ## Best Practices
 
-### 1. Analysis Workflow
+### Audio Analysis
 
-**Recommended Order**:
-1. **Overview**: Scroll through the entire recording to identify regions of interest
-2. **Rough Detection**: Run click detector with the default threshold (μ + 4σ), then adjust
-3. **Manual Review**: Inspect each detected click (FFT spectrum + iFFT waveform)
-4. **Voltage Fitting**: Select regions of interest in voltage recordings, run MathOperations, save analyses
-5. **Export**: Export click detector results (CSV) and voltage fitted curves (CSV)
+1. Load the recording and let the pre-computation finish.
+2. Start at k=1.5. Review the "Above Threshold" table to estimate the false positive rate.
+3. Increase k to reduce false positives; lower it only if genuine clicks are missing.
+4. For any suspicious candidate: step to the frame, open the iFFT window, run "Analyze Decay" to inspect the full feature vector.
+5. Use "Export Data Collection" to batch-export Stage 1 survivors across multiple recordings for offline SVM evaluation.
 
-### 2. Metadata Documentation
+### Voltage Analysis
 
-**Recommended Practice**: Create a `metadata.txt` alongside each recording
-
-**Contents**:
-```
-Date: 2026-03-11
-Time: 14:30:00
-Plant species: Solanum lycopersicum
-Plant ID: TOM-42
-Age: 6 weeks
-Condition: Drought stress (3 days no water)
-Microphone position: 5 cm above stem, 2 cm lateral
-Room temperature: 23°C
-Humidity: 45%
-Background noise level: estimated from μ ± σ displayed in Click Detector dialog
-Experimenter: T. Vaninetti
-Notes: Watered at t=600s
-```
+1. Play the recording at reduced speed to locate events of interest.
+2. Pause at the event and use "Select Region for Analysis" to frame it.
+3. If R² > 0.95, the fit is reliable. If R² < 0.85, adjust the region boundaries or switch signal type.
+4. Save each analysis before moving to the next event.
 
 ---
 
 ## References
 
-1. **FFT Phase Technical Specification**: [FFT_PHASE_TECHNICAL_SPECIFICATION.md](FFT_and_acquisition_specifications/FFT_PHASE_TECHNICAL_SPECIFICATION.md)
-2. **Microphone Normalization Report**: [MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md](normalization_feature/MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md)
-3. **Click Detection Algorithm (v4.0)**: [CLICK_DETECTION_ALGORITHM_v4.md](autoclick/CLICK_DETECTION_ALGORITHM_v4.md)
-4. **User Guide (Normalization)**: [NORMALIZATION_USER_GUIDE.md](normalization_feature/NORMALIZATION_USER_GUIDE.md)
+1. **Click Detection Algorithm v5**: [CLICK_DETECTION_ALGORITHM_v5.md](../autoclick/v5/CLICK_DETECTION_ALGORITHM_v5.md)
+2. **FFT Phase Technical Specification**: [FFT_PHASE_TECHNICAL_SPECIFICATION.md](FFT_PHASE_TECHNICAL_SPECIFICATION.md)
+3. **Microphone Normalization Report**: [MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md](MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md)
 
 ---
 
-**Last Updated**: March 14, 2026  
+**Last Updated**: June 2026  
 **Author**: Tommaso Vaninetti  
 **Version**: 2.0

@@ -1,6 +1,6 @@
 # PlantLeaf – Automatic Ultrasonic Click Detection Algorithm
 
-**Version:** 5.0 (draft)
+**Version:** 5.0
 **Date:** June 2026
 **Authors:** Tommaso Vaninetti
 **Repository:** [PlantLeaf-Desktop-App](https://github.com/TommyVaninetti/PlantLeaf-Desktop-App)
@@ -17,15 +17,16 @@
 2. [v4 → v5 Comparison Summary](#2-v4--v5-comparison-summary)
 3. [System Setup and Signal Representation](#3-system-setup-and-signal-representation)
 4. [Adaptive Noise Estimator (NEW in v5)](#4-adaptive-noise-estimator-new-in-v5)
-5. [Stage 1 – Adaptive Energy Threshold + Run-Length Filter](#5-stage-1--adaptive-energy-threshold--run-length-filter)
-6. [Stage 2 – FFT Filters (SPR + Normalized Peak)](#6-stage-2--fft-filters-spr--normalized-peak)
+5. [Stage 1 – Adaptive Energy Threshold + Run-Length Filter](#5-stage-1-–-adaptive-energy-threshold--run-length-filter)
+6. [Stage 2 – FFT Parameters and Hard Gates](#6-stage-2-–-fft-parameters-and-hard-gates)
 7. [Pre-processing Pipeline for Stage 3 Candidates](#7-pre-processing-pipeline-for-stage-3-candidates)
-8. [Stage 3 – Multi-Criterion Temporal Validation (v5)](#8-stage-3--multi-criterion-temporal-validation-v5)
+8. [Stage 3 – Multi-Criterion Temporal Validation (v5)](#8-stage-3-–-multi-criterion-temporal-validation-v5)
 9. [Stage 4 – Deduplication](#9-stage-4--deduplication)
 10. [Fit Pipeline: τ and R²](#10-fit-pipeline-τ-and-r)
 11. [Feature Summary Table](#11-feature-summary-table)
-12. [Algorithm Version History](#12-algorithm-version-history)
-13. [References](#13-references)
+12. [SVM Classifier — Training Protocol and Results](#12-svm-classifier--training-protocol-and-results)
+13. [Algorithm Version History](#13-algorithm-version-history)
+14. [References](#14-references)
 
 ---
 
@@ -41,7 +42,7 @@ Version 4.0 was designed and validated primarily in **controlled indoor environm
 
 v5 addresses all of these with: an adaptive noise estimator, a more robust run-length filter in Stage 1, a fully redesigned set of Stage 3 features, and an improved decay fit pipeline. All hard thresholds from v4 are replaced with **dimensionless, scale-invariant features** suitable for an SVM classifier.
 
-> **Principal Design:** no single experimentally chosen threshold. All parameters are either physically motivated constants or features fed to an SVM. The noise floor and its standard deviation are the two fundamental quantities from which most features are derived, ensuring invariance to hardware gain and environmental amplitude changes. The SVM will be trained with hundreds of events coming from over 300 hours of recordings.
+> **Principal Design:** no single experimentally chosen threshold. All parameters are either physically motivated constants or features fed to an SVM. The noise floor and its standard deviation are the two fundamental quantities from which most features are derived, ensuring invariance to hardware gain and environmental amplitude changes. The SVM is trained with hundreds of events coming from over 160 hours of recordings.
 
 ---
 
@@ -50,7 +51,7 @@ v5 addresses all of these with: an adaptive noise estimator, a more robust run-l
 | Aspect | v4.0 | v5.0 |
 |---|---|---|
 | Noise floor estimate | Global offline, static per session | Adaptive sliding window (minimum-statistics) |
-| Stage 1 threshold | `μ + k·σ` (static k=5) | `k · Ê_floor` (adaptive floor, k to be set) |
+| Stage 1 threshold | `μ + k·σ` (static k=5) | `k · Ê_floor` (adaptive floor, k=1.5) |
 | Stage 1 run filter | MAX_RUN = 4 frames | MAX_RUN = 3 frames |
 | C1 – Amplitude | Absolute 130 µV | Peak SNR = `max(A[n]) / noise_floor` (dimensionless) |
 | C2 – Pre-silence | Fixed 20-sample guard | Dynamic: pre_window ends where `A[n] < noise_floor + std_noise` going backward from peak |
@@ -146,7 +147,7 @@ else:
 
 **α = 4** (suggested starting value — verify experimentally on outdoor recordings).
 
-**Physical meaning:** a burst frame has energy more than twice the current floor estimate. Using the same gate for both buffers ensures that a click candidate never contaminates either noise estimate simultaneously.
+**Physical meaning:** a burst frame has energy more than four times the current floor estimate. Using the same gate for both buffers ensures that a click candidate never contaminates either noise estimate simultaneously.
 
 ---
 
@@ -308,7 +309,7 @@ EVERY FRAME i:
 | M | 10 sub-windows (75 frames each) | Median-of-minima robustness; single outlier cannot shift median |
 | β | 1.3 | Martin (2001) correction — local min underestimates true floor |
 | α | 4 (verify experimentally) | Burst exclusion: E_i > 4× current floor |
-| k | TBD experimentally | Stage 1 threshold multiplier; candidates: 1.5 or 2 |
+| k | 1.5 | Stage 1 threshold multiplier |
 
 ---
 
@@ -335,8 +336,7 @@ Well within the 128 kB SRAM of the STM32F411. On the PC, negligible.
 Frame i is a Stage 1 CANDIDATE  iff  E_i > k · Ê_floor(i)
 ```
 
-- **k** is the final threshold multiplier. v4 used k=5 on a static estimate; v5 applies k to the adaptive floor.
-- Suggested starting values: k ∈ {1.5, 2}. Choose empirically on outdoor recordings.
+- **k** is the final threshold multiplier. v4 used k=5 on a static estimate and its standard deviation; v5 applies k=1.5 to the adaptive floor.
 - The adaptive floor means the threshold automatically rises in noisy environments and falls in quiet ones — no manual recalibration needed per session.
 
 ### 5.2 Run-Length Filter
@@ -355,41 +355,43 @@ Run of length L:
 
 ---
 
-## 6. Stage 2 – FFT Parameters
+## 6. Stage 2 – Hard Gates
 
-Unchanged from v4 in structure. Both filters operate on the microphone-normalized FFT spectrum. Now they are not hard thresholds but are also fed to the SVM.
+Stage 2 reads the microphone-normalized FFT spectrum and computes three spectral features — SPR, R_spectral, and FPE — which are passed to Stage 3 for SVM classification. Their physical meaning and interpretation are documented alongside the other Stage 3 features in §8.9, where all 16 SVM inputs are described together.
 
-### 6.1. Spectral Peak Ratio (SPR)
+In addition, Stage 2 applies two **hard rejection gates** that discard candidates before the SVM is invoked. SPR is used both as an SVM feature (§8.9) and as the basis for Gate 2; the full SPR description is in §8.9.
 
-```
-SPR = max_k |A_norm[k]|²  /  mean_k |A_norm[k]|²
+### 6.1 Hard Rejection Gates (NEW in v5)
 
-Frame PASSES  iff  SPR ≤ max_spr   (default 20)
-```
+Two hard gates are applied before Stage 3. Candidates failing either gate are permanently rejected and do not reach the SVM.
 
-SPR is amplitude-invariant — it rejects tonal/narrowband signals (EMI, oscillators at 40/80 kHz) regardless of their absolute amplitude. Also, it helps distinguishing flat noise (where SPR is close to 0).
+---
 
-### 6.2 Descriptive Spectral Ratio R
-
-The Stage 2 pass evaluates shape only. In addition, a **descriptive spectral ratio** R is computed for post-hoc analysis:
+**Gate 1 — Minimum Fit Quality (R² < 0.10)**
 
 ```
-E_low  = Σ_{k ∈ [51, 102]} |A[k]|²     (20–40 kHz)
-E_high = Σ_{k ∈ [103, 204]} |A[k]|²    (40–80 kHz)
-
-R = E_low / E_high
+if R² < 0.10  →  reject  (stage_blocked = "Stage2_R2")
 ```
 
-R provides information about the dominant frequency content of the click (low-frequency clicks → R > 1; high-frequency clicks → R < 1) without affecting the detection decision.
+The exponential fit (§10) is computed before this gate. When R² falls below 0.10 the fit has completely failed: the decay segment is either too short, too noisy, or not monotone at all. In this case τ, decay_start, decay_end, and all features derived from the decay window (fall_time_ms, post_SNR, ZCR_post, asymmetry_integral) are unreliable or undefined.
 
-### 6.3 Normalised Dominant Frequency
+Passing a candidate with R²<0.10 to the SVM would mean invoking the model on garbage inputs — the SVM was trained on candidates where the fit succeeded, and cannot generalize to this pathological case. The gate is therefore a **validity check**, not a classification decision.
 
-Corresponds to the frequency where the maximum amplitude is present. It is a descriptive feature.
+> **Why 0.10 and not a higher value?** The threshold is intentionally lenient. R²=0.10 only rejects complete fit failures. Candidates with moderate fit quality (R²=0.3–0.6, common for clicks with secondary reflections) are passed to the SVM, which was specifically trained to handle them.
+
+---
+
+**Gate 2 — Out-of-Distribution SPR (SPR ≥ 100)**
 
 ```
-FPE = `f[argmax(power)]`
-
+if SPR ≥ 100  →  reject  (stage_blocked = "Stage2_SPR")
 ```
+
+SPR ≥ 100 indicates an extremely tonal signal — a narrowband oscillator or EMI tone that is completely unlike anything in the training set. Inspection of the full labeled dataset confirmed that **no training sample (click or noise) had SPR ≥ 100**. Applying the SVM to an input outside its training distribution is unsafe: the model's decision boundary was not calibrated for this region of feature space, and the output probability is uninterpretable.
+
+This gate is an **out-of-distribution (OOD) safeguard**, not a learned classification boundary. It is intentionally set far above all observed training values to avoid discarding borderline cases that a better-trained SVM could handle correctly.
+
+> **Relationship to the SVM feature SPR:** SPR values within the training distribution (observed range ~1–30) are still passed to the SVM as a continuous feature. The hard gate only activates at the extreme tail never seen during training.
 
 ---
 
@@ -449,16 +451,33 @@ Dimensionless. Invariant to hardware gain — if an amplifier is added, both `pe
 
 ### 8.2 Pre-window and pre_SNR  *(replaces C2)*
 
-**Pre-window definition (new):**
+**Pre-window definition:**
 
-Instead of a fixed guard, the pre-window is found dynamically by scanning backward from `peak_idx` on the raw Hilbert envelope:
+The pre-window boundary is found dynamically by scanning backward from
+`peak_idx` on the raw Hilbert envelope:
 
 ```
-pre_window ends at the first n (going backward from peak_idx) where:
+pre_boundary = last n (going backward from peak_idx) where:
     A[n] < noise_floor + std_noise
 ```
 
-Everything before that point is the pre-window. This defines "the signal has not yet emerged from the noise" without any arbitrary guard distance.
+The pre-window is then the **P = 100 samples immediately before `pre_boundary`**
+(or all available samples if fewer than P exist):
+
+```
+pre_window = A[pre_boundary - P : pre_boundary]    P = 100 samples (0.5 ms)
+```
+
+This is **symmetric with the post-window** (§8.3): both capture the immediate
+silence adjacent to the click event, not the entire pre/post-click silence
+region. Averaging over the entire pre-click silence would give pre_SNR ≈ 1.0
+by construction (the noise estimator is trained on those same silent frames),
+reducing discriminative power. The 100-sample localized window is sensitive
+to noise or oscillations occurring immediately before the click.
+
+If `peak_idx` is small and fewer than P samples are available in the current
+frame, the previous frame is appended on the left (see `_build_pre_window`)
+to guarantee that P samples are available regardless of click position.
 
 **pre_SNR:**
 
@@ -466,7 +485,8 @@ Everything before that point is the pre-window. This defines "the signal has not
 pre_SNR = RMS(pre_window) / noise_floor
 ```
 
-A genuine click is preceded by silence → pre_SNR ≈ 1.0. Embedded noise or a sustained event → pre_SNR > 1.5–2.0.
+A genuine click is preceded by silence → pre_SNR ≈ 1.0.
+Embedded noise or a sustained event → pre_SNR > 1.5–2.0.
 
 ---
 
@@ -633,16 +653,54 @@ centroid_shift = SC_early - SC_late    [Hz]
 
 ---
 
-### 8.9 Features carried over from v4
+### 8.9 FFT Spectral Features (computed in Stage 2, passed to SVM)
 
-| Feature | Formula | Notes |
+These three features are computed directly from the normalized FFT magnitude spectrum of the candidate frame. Because they require only the frequency-domain data already available at Stage 2, they are computed there and carried forward into the SVM feature vector — but their role is classification, not gating.
+
+---
+
+**Spectral Peak Ratio (SPR)**
+
+```
+SPR = max_k |A_norm[k]|²  /  mean_k |A_norm[k]|²
+```
+
+Measures how tonal (concentrated) the spectrum is, independently of absolute amplitude. A genuine click excites a broad range of frequencies → low SPR. A narrowband oscillator or EMI tone concentrates energy in one bin → high SPR. The v4 hard SPR threshold is replaced here by a soft SVM input; only the extreme OOD tail (SPR ≥ 100) is still hard-gated in Stage 2 (§6.1).
+
+**Typical ranges observed in training data:** clicks ≈ 1–8, noise ≈ 1–30.
+
+---
+
+**Spectral Energy Ratio (R_spectral)**
+
+```
+E_low  = Σ_{k ∈ [51, 102]}  |A[k]|²     (20–40 kHz half-band)
+E_high = Σ_{k ∈ [103, 204]} |A[k]|²     (40–80 kHz half-band)
+
+R_spectral = E_low / E_high
+```
+
+Describes the dominant frequency content of the event: R > 1 → energy concentrated in the lower half of the analysis band; R < 1 → energy concentrated in the upper half. Plant cavitation clicks can fall on either side depending on xylem conduit geometry and the embolism event. The SVM learns the click distribution in this feature without a hard threshold.
+
+---
+
+**Frequency of Peak Energy (FPE)**
+
+```
+FPE_hz = f[ argmax_k |A_norm[k]|² ]
+```
+
+The frequency bin carrying the maximum spectral power, converted to Hz. Provides the SVM with information about where in the 20–80 kHz band the click is brightest. In the feature importance analysis (§12.9), FPE ranked 3rd — clicks tend to cluster in the 20–40 kHz range while many noise events peak higher.
+
+---
+
+**Fit-derived features: τ, R², fit_coverage**
+
+| Feature | Formula | SVM? |
 |---|---|---|
-| SPR | `max(power) / mean(power)` over 154 bins | Unchanged from v4 |
-| R_spectral | `E_low / E_high` (20–40 kHz vs 40–80 kHz) | Descriptive, unchanged |
-| FPE | `f[argmax(power)]` | Descriptive frequency location |
-| τ | From improved fit pipeline (§10) | Now SVM feature, not hard threshold |
-| R² | From improved fit pipeline (§10) | Now SVM feature, not hard threshold |
-| fit_coverage | `n_fit / (decay_end - decay_start)` | Diagnostic: fraction of decay used in fit |
+| `tau_ms` | From OLS fit pipeline (§10) | ✓ |
+| `R2` | From OLS fit pipeline (§10) | ✓ |
+| `fit_coverage` | `n_fit / (decay_end − decay_start)` | ✗ (diagnostic only — see §12.5) |
 
 ---
 
@@ -785,27 +843,27 @@ The second local peak visible in some click recordings (a reflection or secondar
 
 ## 11. Feature Summary Table
 
-All features below are fed to the SVM. No hard thresholds in Stage 3.
+16 of the 17 computed features are fed to the SVM. `fit_coverage` is computed but excluded from inference (see §12.5).
 
-| # | Feature | Domain | Physical meaning |
-|---|---|---|---|
-| 1 | `peak_SNR` | iFFT | Amplitude relative to noise floor |
-| 2 | `pre_SNR` | iFFT | Silence before click |
-| 3 | `post_SNR` | iFFT | Return to silence after click |
-| 4 | `rise_time_ms` | iFFT envelope | Onset speed |
-| 5 | `fall_time_ms` | iFFT envelope | Decay duration at noise level |
-| 6 | `asymmetry_integral` | iFFT envelope | Rise/fall shape asymmetry |
-| 7 | `ZCR_pre` | iFFT raw | Oscillation rate before click |
-| 8 | `ZCR_click` | iFFT raw | Oscillation rate during click |
-| 9 | `ZCR_post` | iFFT raw | Oscillation rate during decay |
-| 10 | `kurtosis` | iFFT raw | Impulsivity of event |
-| 11 | `centroid_shift` | FFT | Spectral evolution during decay |
-| 12 | `τ_ms` | iFFT envelope fit | Exponential decay constant |
-| 13 | `R²` | iFFT envelope fit | Exponential fit quality |
-| 14 | `fit_coverage` | iFFT envelope fit | Fraction of decay used in fit |
-| 15 | `SPR` | FFT | Spectral broadband shape |
-| 16 | `R_spectral` | FFT | Low vs high frequency balance |
-| 17 | `FPE` | FFT | Dominant frequency |
+| # | Feature | Domain | Physical meaning | SVM? |
+|---|---|---|---|---|
+| 1 | `peak_SNR` | iFFT | Amplitude relative to noise floor | ✓ |
+| 2 | `pre_SNR` | iFFT | Silence before click | ✓ |
+| 3 | `post_SNR` | iFFT | Return to silence after click | ✓ |
+| 4 | `rise_time_ms` | iFFT envelope | Onset speed | ✓ |
+| 5 | `fall_time_ms` | iFFT envelope | Decay duration at noise level | ✓ |
+| 6 | `asymmetry_integral` | iFFT envelope | Rise/fall shape asymmetry | ✓ |
+| 7 | `ZCR_pre` | iFFT raw | Oscillation rate before click | ✓ |
+| 8 | `ZCR_click` | iFFT raw | Oscillation rate during click | ✓ |
+| 9 | `ZCR_post` | iFFT raw | Oscillation rate during decay | ✓ |
+| 10 | `kurtosis` | iFFT raw | Impulsivity of event | ✓ |
+| 11 | `centroid_shift_hz` | FFT | Spectral evolution during decay | ✓ |
+| 12 | `τ_ms` | iFFT envelope fit | Exponential decay constant | ✓ |
+| 13 | `R²` | iFFT envelope fit | Exponential fit quality | ✓ |
+| 14 | `fit_coverage` | iFFT envelope fit | Fraction of decay used in fit | ✗ (diagnostic only) |
+| 15 | `SPR` | FFT | Spectral broadband shape | ✓ |
+| 16 | `R_spectral` | FFT | Low vs high frequency balance | ✓ |
+| 17 | `FPE_hz` | FFT | Dominant frequency | ✓ |
 
 **Removed from v4:**
 - `E_W1 / E_W4` ratio (fixed 300-sample window energy decay) → replaced by τ from improved fit
@@ -814,7 +872,201 @@ All features below are fed to the SVM. No hard thresholds in Stage 3.
 
 ---
 
-## 12. Algorithm Version History
+## 12. SVM Classifier — Training Protocol and Results
+
+### 12.1 Design Philosophy: High-Recall Bias
+
+The SVM is optimized for **recall** (sensitivity), not F1 or accuracy. The rationale follows from the cost asymmetry of the two error types in plant stress research:
+
+- **False Negative (missed click):** a genuine acoustic emission is lost. In experiments that may run for hours with only a few dozen real events, losing even one click represents a significant fraction of the evidence. Repeated false negatives can mask or distort the plant's stress response.
+- **False Positive (false alarm):** an additional noise event appears in the output. A human reviewer can quickly dismiss it; automated downstream analysis can tolerate a controlled FP rate.
+
+Given this asymmetry, the recall target is set at **≥ 0.90**, and the decision threshold is lowered from the SVM default (0.50) to whatever value on the ROC curve first achieves that recall. At the same time, precision is monitored to ensure the FP rate does not become unmanageably high.
+
+---
+
+### 12.2 Dataset Composition
+
+The training dataset was assembled from manually labeled Stage 1 candidates collected across multiple recording sessions and plant species:
+
+| | Count |
+|---|---|
+| Total labeled rows | 285 |
+| Confirmed clicks (label=1) | 91 |
+| Noise events (label=0) | 194 |
+| Recording sessions | 38 |
+
+**Species and recording conditions in the dataset:**
+
+| Category | Species / Environment | Stimulus type |
+|---|---|---|
+| Stressed plants | *Aloe vera* | Mechanical (needle), water stress |
+| Stressed plants | *Ferrocactus* (cactus) | Mechanical (needle), water stress |
+| Stressed plants | *Calanchoe* | Water stress |
+| Stressed plants | Carnivorous plant | Mechanical |
+| Noise-only | Outdoor balcony | Wind, traffic, bird, construction |
+| Noise-only | Indoor laboratory room | HVAC, electronic, ambient |
+| Noise-only | Empty room, no plant | Baseline MEMS noise |
+
+Recording conditions span controlled indoor environments and uncontrolled outdoor exposures, deliberately chosen to make the noise class diverse and representative of real deployment scenarios.
+
+**Set B (held-out test set):** one session of *Aloe vera* + water stress (`Aloe_acqua50ml_misurazione1_11032026_09`, 16 clicks + 10 noise), withheld entirely from training and hyperparameter search.
+
+---
+
+### 12.3 Hard-Negative Mining (Noise Pre-Filtering Before Training)
+
+Before the SVM is trained, Stage 2 hard gates (§6.1) are applied to the **noise samples only**:
+
+```
+Noise samples with R² < 0.10  or  SPR ≥ 100  →  removed from training set
+194 noise samples  →  192 noise samples (2 removed)
+Click samples: unchanged (all 91 retained)
+```
+
+**Rationale:** trivially rejectable noise samples (catastrophic fit failures, extreme tonal signals) would be correctly classified by almost any model. Including them in training inflates apparent specificity without teaching the SVM anything about the hard cases — noise signals that are broadband, impulsive, and superficially similar to genuine clicks in feature space. By removing the trivial negatives, the SVM is forced to learn the discrimination boundary in the region that actually matters.
+
+This is a form of **hard-negative mining**: rather than curating individual difficult examples, the Stage 2 gates act as an automatic filter that concentrates training on the non-trivial portion of the noise distribution.
+
+---
+
+### 12.4 Session-Level Cross-Validation (Preventing Data Leakage)
+
+Cross-validation uses **StratifiedGroupKFold** with groups defined at the session level (one group = one `.paudio` recording file):
+
+- Each fold is guaranteed to have no session appearing in both training and validation splits.
+- **Why this matters:** a single recording session can contribute dozens of Stage 1 candidates. Without session-level grouping, the same physical recording could have some candidates in training and others in validation. The SVM could then learn recording-specific acoustic signatures (microphone position, plant height, background noise level) rather than generalizable click morphology — artificially inflating CV metrics.
+- 5-fold cross-validation; stratification ensures each fold preserves the click/noise class ratio.
+
+---
+
+### 12.5 `fit_coverage` Exclusion
+
+`fit_coverage` (fraction of the decay window successfully used in the OLS fit) is computed alongside the other features but **excluded from the SVM feature vector**:
+
+```
+Active SVM features: 16 of 17  (fit_coverage excluded)
+```
+
+The reason is potential artificial discrimination: a genuine click tends to have a clean, long decay that the fit pipeline can fit well (high coverage), while a noise burst may produce a shorter or noisier decay (lower coverage). Including fit_coverage would give the SVM a shortcut that may not generalize — coverage depends on the specific decay window selection algorithm and the noise floor estimate, both of which could change with hardware or environmental conditions. The other 16 features are more directly tied to the physical properties of the event.
+
+---
+
+### 12.6 Kernel and Hyperparameter Search
+
+Two kernel families were evaluated in preliminary experiments: linear and RBF. The RBF kernel was selected because the click/noise boundary in the 16-dimensional feature space is non-linear (demonstrated empirically).
+
+**Grid search (RBF kernel):**
+
+| Hyperparameter | Search range | Best value |
+|---|---|---|
+| C (regularization) | {0.1, 1, 10, 50, 100} | **50** |
+| γ (RBF bandwidth) | {0.001, 0.01, 0.1, 1} | **0.01** |
+
+- Primary scoring metric: **recall** (not F1, not accuracy)
+- 20 combinations × 5 folds = 100 fits
+- Best CV recall at default threshold: 0.728
+
+---
+
+### 12.7 Decision Threshold Optimization
+
+The SVM's default decision threshold (0.50) gives poor recall (0.467 at best CV params). The optimal threshold is found from the out-of-fold ROC curve:
+
+```
+Threshold = lowest value achieving recall ≥ 0.90 on cross-validated predictions
+Result: threshold = 0.220
+```
+
+At this threshold the model aggressively accepts borderline candidates. The precision drop (0.660 → 0.540) is acceptable given the cost asymmetry described in §12.1.
+
+---
+
+### 12.8 Results
+
+**Cross-validated performance on Set A (StratifiedGroupKFold, 5 folds):**
+
+| Metric | Default threshold = 0.50 | Operational threshold = 0.220 |
+|---|---|---|
+| Recall | 0.467 | **0.907** |
+| Precision | 0.660 | 0.540 |
+| Specificity | 0.901 | 0.681 |
+| F1 | 0.547 | 0.677 |
+| AUC-ROC | 0.835 | 0.835 |
+
+**Held-out test set (Set B — unseen session, *Aloe vera* + water):**
+
+| Metric | Value |
+|---|---|
+| Recall | **0.875** (14/16 clicks detected) |
+| Precision | 0.824 |
+| Specificity | 0.700 |
+| F1 | 0.848 |
+| AUC-ROC | **0.925** |
+
+The Set B recall (0.875) is slightly below the CV target (0.907). This is expected: Set B represents a genuinely different session and the threshold was optimized on Set A. The AUC (0.925) confirms that the underlying discrimination is strong; the small gap is threshold positioning, not model failure.
+Future developments will aim to a more precise selection of clicks and noises in Set A (note that precision is low because of hard-mining and that the current dataset, because of this reason, might have misclassified some noises; proof that the current SVM achieves good precision can be accounted in Dataset B, composed of all noise passing stage 1 and 2). An even stronger annotation method to divide clicks and noise confirmed as such will be soon thoght and developed. If you have any suggestion, don't hesitate to reach out!
+
+---
+
+### 12.9 Feature Importance
+
+Permutation importance computed on Set A (n_repeats=15, metric=recall drop when feature is shuffled):
+
+| Rank | Feature | Δ Recall | Interpretation |
+|---|---|---|---|
+| 1 | `fall_time_ms` | +0.119 ± 0.028 | Primary decay duration; most discriminative single feature |
+| 2 | `peak_SNR` | +0.104 ± 0.021 | Amplitude above noise; second-most important |
+| 3 | `FPE_hz` | +0.065 ± 0.032 | Dominant frequency; clicks cluster in 20–40 kHz range |
+| 4 | `post_SNR` | +0.064 ± 0.028 | Return to silence after event |
+| 5 | `pre_SNR` | +0.061 ± 0.027 | Silence before event |
+| 6 | `tau_ms` | +0.056 ± 0.020 | Decay time constant |
+| 7 | `rise_time_ms` | +0.047 ± 0.020 | Onset speed |
+| 8 | `kurtosis` | +0.044 ± 0.034 | Impulsivity |
+| 9 | `ZCR_post` | +0.032 ± 0.023 | Oscillation during decay |
+| 10 | `asymmetry_integral` | +0.025 ± 0.020 | Rise/fall shape |
+| 11 | `ZCR_pre` | +0.023 ± 0.022 | Oscillation before click |
+| 12 | `ZCR_click` | +0.017 ± 0.013 | Oscillation during click |
+| 13 | `R_spectral` | +0.015 ± 0.018 | Spectral balance |
+| 14 | `R2` | +0.010 ± 0.021 | Fit quality (soft version of the hard gate) |
+| 15 | `SPR` | +0.006 ± 0.019 | Spectral tonality (soft version of the hard gate) |
+| 16 | `centroid_shift_hz` | −0.002 ± 0.016 | No measurable contribution at current dataset size |
+
+> **Note on `centroid_shift_hz`:** the near-zero importance does not mean spectral centroid shift is physically irrelevant. It may lack discriminative power at the current dataset size (n=75 clicks) or may be correlated with other features already captured. 
+
+> **Note on `R2` and `SPR`:** both appear at the bottom of the importance ranking, consistent with the hard gate design — the hard gates already remove the extreme cases where R² and SPR would have been most predictive. What remains in the training set is the moderate range where both features still carry some signal but are no longer decisive alone.
+
+---
+
+### 12.10 Deployment
+
+The trained model is saved as a `.pkl` file containing:
+
+```python
+{
+    'pipeline':  sklearn.Pipeline,   # steps: imputer → scaler → SVM
+    'threshold': 0.220,              # operational decision threshold
+    'kernel':    'rbf',
+    'features':  [...],              # ordered list of 16 feature names
+    'all_results': {...}             # full CV log
+}
+```
+
+Inference:
+
+```python
+import joblib, numpy as np
+model = joblib.load('plantleaf_svm_v5_nofitcoverage.pkl')
+pipe  = model['pipeline']
+thr   = model['threshold']   # 0.220
+# X: (n, 16) array, columns in model['features'] order
+proba = pipe.predict_proba(X)[:, 1]
+pred  = (proba >= thr).astype(int)   # 1 = click, 0 = noise
+```
+
+---
+
+## 13. Algorithm Version History
 
 | Version | Date | Key changes |
 |---|---|---|
@@ -824,11 +1076,11 @@ All features below are fed to the SVM. No hard thresholds in Stage 3.
 | v3.0 | Februery 2026 | R² removed as gate; 3-criteria (SNR, pre_snr, E_W1>E_W4) |
 | v3.1 | March 2026 | Added asymmetry (C4), τ range (C5); window extended to 300 samples |
 | v4.0 | March 2026 | Absolute peak_iFFT (C1=130µV); τ criterion; R² criterion; asymmetry reformulated; Gibbs suppressor v3; Stage 1 k=5 + MAX_RUN=4; Stage 2 normalized peak filter |
-| **v5.0** | **May 2026** | **Adaptive noise estimator; Stage 1 adaptive threshold + MAX_RUN=3; all hard thresholds replaced with SVM features; improved fit pipeline (dynamic window, Gaussian smoothing, slope-based decay_start); new features: post_SNR, ZCR×3, kurtosis, centroid_shift, rise/fall time, asymmetry_integral; E_W1/E_W4 removed** |
+| **v5.0** | **May–June 2026** | **Adaptive noise estimator; Stage 1 adaptive threshold + MAX_RUN=3; Stage 2 hard gates (R²<0.10, SPR≥100); all other thresholds replaced with SVM features; improved fit pipeline (dynamic window, Gaussian smoothing, slope-based decay_start); new features: post_SNR, ZCR×3, kurtosis, centroid_shift, rise/fall time, asymmetry_integral; E_W1/E_W4 removed; RBF-SVM trained on 285 labeled events from 38 sessions (16 features, threshold=0.220, CV recall=0.907, Set B AUC=0.925)** |
 
 ---
 
-## 13. References
+## 14. References
 
 1. **Khait I., et al.** "Sounds emitted by plants under stress are airborne and informative." *Cell*, 186(7):1328–1336, 2023.
 2. **Martin R.** "Noise power spectral density estimation based on optimal smoothing and minimum statistics." *IEEE Trans. Speech Audio Process.*, 9(5):504–512, 2001. *(Minimum-statistics noise floor estimator)*
@@ -843,4 +1095,4 @@ All features below are fed to the SVM. No hard thresholds in Stage 3.
 ---
 
 *Document maintained by the PlantLeaf project contributors.*
-*Last updated: June 2026 — v5.0 draft*
+*Last updated: June 2026 — v5.0*

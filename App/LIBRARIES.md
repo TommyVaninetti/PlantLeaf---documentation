@@ -1,4 +1,4 @@
-# 📚 Libraries and Technologies
+# Libraries and Technologies
 
 ## Overview
 
@@ -11,16 +11,15 @@ This document provides detailed justification for the technology choices in **Pl
 ### 1. Python 3.8+
 
 **Why Python?**
-- ✅ **Rapid Prototyping**: Ideal for research software with evolving requirements
-- ✅ **Scientific Ecosystem**: Extensive libraries for signal processing (NumPy, SciPy)
-- ✅ **Cross-Platform**: Single codebase runs on Windows, macOS, Linux
-- ✅ **Readable Code**: Maintainable for academic collaboration and peer review
-- ❌ **Performance Trade-off**: Lower speed than C/C++, mitigated by NumPy/CMSIS-DSP offloading
+- **Rapid Prototyping**: Ideal for research software with evolving requirements
+- **Scientific Ecosystem**: Extensive libraries for signal processing (NumPy, SciPy)
+- **Cross-Platform**: Single codebase runs on Windows, macOS, Linux
+- **Readable Code**: Maintainable for academic collaboration and peer review
+- **Performance Trade-off**: Lower speed than C/C++, mitigated by NumPy/CMSIS-DSP offloading
 
 **Alternatives Considered**:
 - **C++/Qt**: Higher performance but steeper learning curve, slower iteration
 - **MATLAB**: Excellent for prototyping but expensive, not deployable as standalone app
-- **Julia**: Emerging language with good performance, but smaller ecosystem
 
 **Decision**: Python's balance of development speed and scientific library support outweighed performance concerns, especially since FFT computation is offloaded to firmware (STM32F411CEU6 CMSIS-DSP).
 
@@ -33,17 +32,18 @@ This document provides detailed justification for the technology choices in **Pl
 **Official Documentation**: [https://doc.qt.io/qtforpython/](https://doc.qt.io/qtforpython/)
 
 **Why PySide6?**
-- ✅ **Professional UI**: Native look-and-feel on all platforms (Windows, macOS, Linux)
-- ✅ **Rich Widget Library**: Complex layouts, dialogs, menus, toolbars
-- ✅ **Signal/Slot Architecture**: Clean event-driven programming model
-- ✅ **Theme Support**: Custom CSS-like styling (8 themes: dark/light × 4 color schemes)
-- ✅ **LGPL License**: More permissive than PyQt (GPL), allows commercial distribution
-- ✅ **Active Maintenance**: Official Qt Company support, frequent updates
+- **Professional UI**: Native look-and-feel on all platforms (Windows, macOS, Linux)
+- **Rich Widget Library**: Complex layouts, dialogs, menus, toolbars
+- **Signal/Slot Architecture**: Clean event-driven programming model
+- **Theme Support**: Custom CSS-like styling (8 themes: dark/light × 4 color schemes)
+- **LGPL License**: More permissive than PyQt (GPL), allows commercial distribution
+- **Active Maintenance**: Official Qt Company support, frequent updates
 
 **Installation**:
 ```bash
 pip install PySide6==6.9.0
 ```
+Please note that version 6.9.0 was adopted because new versions were causing problems with PyQtGraph.
 
 **Key Modules Used**:
 - `QtWidgets`: Core UI elements (QMainWindow, QDialog, QPushButton, etc.)
@@ -52,11 +52,6 @@ pip install PySide6==6.9.0
 
 **Alternatives Considered**:
 - **PyQt6**: Similar API but GPL license (restrictive for distribution)
-- **Tkinter**: Standard library but limited widgets, dated appearance
-- **Kivy**: Modern but less stable, smaller community
-- **wxPython**: Good cross-platform but less polished than Qt
-
-**Decision**: PySide6's LGPL license, professional UI quality, and extensive documentation made it the clear choice for a scientific application targeting academic and potential commercial use.
 
 ---
 
@@ -67,12 +62,12 @@ pip install PySide6==6.9.0
 **GitHub**: [https://github.com/pyqtgraph/pyqtgraph](https://github.com/pyqtgraph/pyqtgraph)
 
 **Why PyQtGraph?**
-- ✅ **High Performance**: Hardware-accelerated OpenGL rendering for >1000 FPS
-- ✅ **Real-Time Capable**: Updates at 60 FPS (though the FFT frame rate is 390, it'd be useless and impossible to plot all data on a normal screen) without lag
-- ✅ **Qt Integration**: Native PySide6/PyQt6 compatibility
-- ✅ **Scientific Features**: Logarithmic axes, crosshairs, region selection
-- ✅ **Zero Dependencies**: Pure Python + NumPy (no external C libraries)
-- ✅ **MIT License**: Permissive, no restrictions
+- **High Performance**: Hardware-accelerated OpenGL rendering for >1000 FPS
+- **Real-Time Capable**: Updates at 60 FPS (though the FFT frame rate is 390, it'd be useless and impossible to plot all data on a normal screen) without lag
+- **Qt Integration**: Native PySide6/PyQt6 compatibility
+- **Scientific Features**: Logarithmic axes, crosshairs, region selection
+- **Zero Dependencies**: Pure Python + NumPy (no external C libraries)
+- **MIT License**: Permissive, no restrictions
 
 **Installation**:
 ```bash
@@ -85,7 +80,6 @@ pip install pyqtgraph
 |---------|-----------|---------|--------|
 | **PyQtGraph** | 5-10% | <5 ms | ~50 MB |
 | Matplotlib | 40-60% | 50-100 ms | ~200 MB |
-| Plotly | 20-30% | 20-40 ms | ~150 MB |
 
 **Key Features Used**:
 - `PlotWidget`: Main plotting canvas for time-series and FFT spectra
@@ -96,10 +90,8 @@ pip install pyqtgraph
 
 **Alternatives Considered**:
 - **Matplotlib**: Standard library for scientific plotting, but **too slow** for real-time
-- **Plotly**: Interactive web-based plots, but **resource-heavy** and not Qt-native
-- **Vispy**: OpenGL-accelerated, but **less mature** and steeper learning curve
 
-**Decision**: PyQtGraph's combination of **real-time performance** (critical for 390 FPS FFT display) and **Qt-native integration** made it indispensable. No other library could maintain smooth 60 FPS UI updates while processing 200 kHz audio streams.
+**Decision**: PyQtGraph's combination of **real-time performance** (critical real time display) and **Qt-native integration** made it indispensable. No other library could maintain smooth 60 FPS UI updates while processing 200 kHz audio streams.
 
 ---
 
@@ -110,12 +102,12 @@ pip install pyqtgraph
 **Official Site**: [https://numpy.org/](https://numpy.org/)
 
 **Why NumPy?**
-- ✅ **Foundation for Scientific Python**: De facto standard for numerical arrays
-- ✅ **Vectorized Operations**: 10-100× faster than pure Python loops
-- ✅ **Memory Efficiency**: Contiguous C arrays, minimal overhead
-- ✅ **FFT/IFFT**: `numpy.fft` module (FFTPACK backend)
-- ✅ **Broadcasting**: Elegant syntax for element-wise operations
-- ✅ **BSD License**: Fully permissive
+- **Foundation for Scientific Python**: De facto standard for numerical arrays
+- **Vectorized Operations**: 10-100× faster than pure Python loops
+- **Memory Efficiency**: Contiguous C arrays, minimal overhead
+- **FFT/IFFT**: `numpy.fft` module (FFTPACK backend)
+- **Broadcasting**: Elegant syntax for element-wise operations
+- **BSD License**: Fully permissive
 
 **Installation**:
 ```bash
@@ -147,12 +139,6 @@ pip install numpy
 - **Tukey window generation**: ~0.01 ms
 - **Complex spectrum construction**: ~0.05 ms
 
-**Alternatives Considered**:
-- **Pure Python**: Too slow (100-1000× slower)
-- **CuPy** (GPU): Overkill for 512-point FFT, adds CUDA dependency
-
-**Decision**: NumPy is non-negotiable for scientific Python. No viable alternative exists.
-
 ---
 
 ### 5. SciPy
@@ -160,11 +146,10 @@ pip install numpy
 **Official Site**: [https://scipy.org/](https://scipy.org/)
 
 **Why SciPy?**
-- ✅ **Advanced Signal Processing**: `scipy.signal` for filtering, windowing, spectral analysis
-- ✅ **Statistical Tools**: `scipy.stats` for error analysis, distributions
-- ✅ **Optimization**: `scipy.optimize` for curve fitting (future: peak fitting)
-- ✅ **Sparse Arrays**: Efficient storage for large FFT spectra
-- ✅ **BSD License**: Permissive
+- **Advanced Signal Processing**: `scipy.signal` for filtering, windowing, spectral analysis
+- **Optimization**: `scipy.optimize` for curve fitting (future: peak fitting)
+- **Sparse Arrays**: Efficient storage for large FFT spectra
+- **BSD License**: Permissive
 
 **Installation**:
 ```bash
@@ -181,40 +166,138 @@ pip install scipy
    filtered_voltage = filtfilt(b, a, raw_voltage)
    ```
 
-2. **Window Functions**:
-   ```python
-   from scipy.signal.windows import tukey
-   # 10% taper Tukey window for Gibbs artifact suppression
-   window = tukey(154, alpha=0.1)
-   ```
-
-3. **Statistical Analysis**:
-   ```python
-   from scipy.stats import norm
-   # Calculate 95% confidence interval for error budget
-   confidence_interval = norm.interval(0.95, loc=mean, scale=std)
-   ```
-
 **Alternatives Considered**:
-- **Custom Implementations**: Reinventing the wheel (error-prone, not peer-reviewed)
 - **NumPy-only**: Limited signal processing functions
 
-**Decision**: SciPy's `scipy.signal` module is the gold standard for signal processing in Python. Its peer-reviewed algorithms (e.g., Parks-McClellan filter design) ensure scientific rigor.
+---
+
+## Machine Learning
+
+### 6. scikit-learn
+
+**Official Site**: [https://scikit-learn.org/](https://scikit-learn.org/)
+
+**Why scikit-learn?**
+- **SVM with probability output**: `SVC(probability=True)` enables Platt scaling — calibrated probabilities that can be thresholded independently of the training decision boundary, which is essential for the recall-optimised threshold used in v5
+- **Pipeline API**: chains `SimpleImputer → StandardScaler → SVC` into a single serialisable object; the entire preprocessing + model is loaded and applied in one call at inference time with no risk of mismatched transforms
+- **Session-level cross-validation**: `StratifiedGroupKFold` prevents recording-level data leakage by keeping all candidates from the same `.paudio` file in the same fold
+- **Recall-optimised hyperparameter search**: `GridSearchCV` with a custom recall scorer selects hyperparameters that maximise click detection, not accuracy
+- **Model-agnostic feature importance**: `permutation_importance` measures the recall drop when each feature is shuffled — directly reflects the metric that matters
+- **BSD License**: Permissive
+
+**Installation**:
+```bash
+pip install scikit-learn
+```
+
+**Key components used**:
+- `SVC(probability=True, kernel='rbf', C=50, gamma=0.01)` — RBF-kernel classifier with Platt-calibrated probabilities
+- `Pipeline([('imputer', SimpleImputer()), ('scaler', StandardScaler()), ('svm', SVC(...))])` — end-to-end preprocessing + inference object
+- `StratifiedGroupKFold(n_splits=5)` — session-aware cross-validation
+- `GridSearchCV(scoring='recall')` — hyperparameter search on 20 combinations × 5 folds
+- `permutation_importance(n_repeats=15)` — feature ranking by recall drop
+
+**Use in PlantLeaf**:
+- **Training** (`src/ml/train_svm.py`): full cross-validated training pipeline; model saved as `.pkl` via joblib
+- **Inference** (`src/core/click_pipeline_v5.py`): the loaded `Pipeline` object runs Stage 3 of the real-time detection loop; joblib is imported lazily so the module remains usable without scikit-learn if Stage 3 is disabled
+
+**Alternatives considered**:
+- **TensorFlow / PyTorch**: neural networks require far more labeled data than currently available (91 confirmed clicks); SVMs generalise well in the hundreds-of-samples regime
+- **Custom libsvm wrapper**: lower-level, no Pipeline API; scikit-learn's wrapper provides everything needed with no extra integration work
+
+---
+
+### 7. joblib
+
+**Official Site**: [https://joblib.readthedocs.io/](https://joblib.readthedocs.io/)
+
+**Why joblib?**
+- **Efficient model serialisation**: saves and loads NumPy arrays inside scikit-learn Pipelines more efficiently than standard `pickle` (memory-mapped arrays, no redundant copies)
+- **Automatic parallelism**: used internally by scikit-learn for `GridSearchCV` and `permutation_importance` with no extra configuration
+- **BSD License**: Permissive
+
+**Installation**:
+```bash
+pip install joblib
+```
+
+joblib is a hard dependency of scikit-learn and is installed automatically with it.
+
+**Use in PlantLeaf**:
+- **Training** (`src/ml/train_svm.py`): `joblib.dump(model_dict, 'model.pkl')` saves the fitted pipeline, threshold, kernel, feature list, and CV log
+- **Inference** (`src/core/click_pipeline_v5.py`): imported lazily at the first call to `load_svm_model()`; `joblib.load('model.pkl')` restores the full pipeline in one call
+- **Evaluation scripts** (`src/ml/evaluate_candidates.py`, `src/ml/analyze_dataset.py`): load the same `.pkl` to run batch inference on candidate CSV files
+
+---
+
+## Offline Analysis
+
+### 8. pandas
+
+**Official Site**: [https://pandas.pydata.org/](https://pandas.pydata.org/)
+
+**Why pandas?**
+- **CSV I/O with heterogeneous types**: reads `*_candidates.csv` files (mix of float features, integer indices, string file names, and optional integer labels) in one call, preserving column types
+- **Italian locale robustness**: the `str.replace(',', '.')` + `pd.to_numeric(..., errors='coerce')` pattern handles decimal-comma CSVs exported from Excel without requiring a separate CSV dialect or re-export
+- **GroupBy**: per-file confusion matrix and click-rate statistics are computed with `df.groupby('file')`, avoiding explicit loops over file names
+- **BSD License**: Permissive
+
+**Installation**:
+```bash
+pip install pandas
+```
+
+**Key use cases**:
+- `evaluate_candidates.py`: loads multi-file candidate CSVs, appends `svm_probability`, `svm_prediction`, `stage_blocked` columns, writes annotated output CSV
+- `analyze_dataset.py`: computes per-file TP/FP/FN/TN, duration-weighted click rates, and passes the annotated DataFrame to the plot generator
+- `train_svm.py`: loads the labeled training CSV, splits into Set A / Set B by session
+
+**Note**: pandas is used only in the offline ML/analysis scripts (`src/ml/`), not in the real-time application loop.
+
+**Alternatives considered**:
+- **Pure NumPy / csv module**: no native support for named columns with mixed types; manual parsing of Italian-locale decimals and optional label columns would require significant boilerplate
+
+---
+
+### 9. matplotlib
+
+**Official Site**: [https://matplotlib.org/](https://matplotlib.org/)
+
+**Why matplotlib (for offline analysis)?**
+- **Headless rendering**: `matplotlib.use('Agg')` generates PNG files without opening any window or requiring a display — no Qt application instance needed for batch processing
+- **`constrained_layout`**: automatically prevents title/tick-label overlap across multi-panel figures without manual spacing tuning; this was the primary reason for switching from PyQtGraph for this use case (PyQtGraph's layout engine required significant effort to avoid clipping and overlap in the multi-row overview + zoom-panel layout)
+- **`vlines` API**: clean per-spike rendering for the click-distribution raster plot — no NaN-separator trick needed unlike PyQtGraph line plots
+- **Subplot stacking**: `plt.subplots(n_rows, 1)` with a single `figsize` argument creates the overview + per-cluster zoom panels in one call
+- **BSD License**: Permissive
+
+**Installation**:
+```bash
+pip install matplotlib
+```
+
+**Key features used** (`src/ml/analyze_dataset.py`):
+- `plt.subplots(n_rows, 1, constrained_layout=True)` — multi-row figure (overview + per-cluster zoom)
+- `ax.vlines(click_times, 0, 1)` — spike raster for click-distribution timeline
+- `ax.axvspan(x_lo, x_hi, alpha=0.15)` — semi-transparent cluster-window markers on the overview panel
+- `mticker.MultipleLocator` + `FuncFormatter` — clock-aligned tick intervals (10 s, 1 min, 5 min, 1 h, …) labelled as MM:SS / H:MM:SS
+- `fig.savefig(..., facecolor=BG)` — consistent dark background in saved PNGs
+
+**Performance note**: matplotlib is not used for real-time in-app plotting. As shown in §3, it is 40–60× slower than PyQtGraph for live updates, which makes it unsuitable for the 390 FPS FFT stream. Its use is intentionally restricted to the offline analysis pipeline where rendering latency is irrelevant.
 
 ---
 
 ## Hardware Communication
 
-### 6. PySerial
+### 10. PySerial
 
 **Official Site**: [https://pythonhosted.org/pyserial/](https://pythonhosted.org/pyserial/)
 
 **Why PySerial?**
-- ✅ **Cross-Platform Serial I/O**: Works on Windows, macOS, Linux without modification
-- ✅ **USB CDC Support**: Virtual COM port communication with STM32F411CEU6
-- ✅ **Reliable**: Mature library (18+ years), widely used in industry
-- ✅ **Simple API**: Minimal learning curve
-- ✅ **BSD License**: Permissive
+- **Cross-Platform Serial I/O**: Works on Windows, macOS, Linux without modification
+- **USB CDC Support**: Virtual COM port communication with STM32F411CEU6
+- **Reliable**: Mature library (18+ years), widely used in industry
+- **Simple API**: Minimal learning curve
+- **BSD License**: Permissive
 
 **Installation**:
 ```bash
@@ -251,16 +334,16 @@ phase = np.frombuffer(frame_data[616:], dtype=np.int8)
 
 ## Deployment
 
-### 7. PyInstaller
+### 11. PyInstaller
 
 **Official Site**: [https://www.pyinstaller.org/](https://www.pyinstaller.org/)
 
 **Why PyInstaller?**
-- ✅ **Single-File Executables**: Bundles Python + dependencies into `.exe` (Windows) or `.app` (macOS)
-- ✅ **Cross-Platform**: Same spec file works on all platforms
-- ✅ **PySide6 Support**: Automatic detection of Qt plugins
-- ✅ **Code Signing Compatible**: Supports macOS notarization, Windows Authenticode
-- ✅ **GPL License** (with distribution exceptions): Allows proprietary apps
+- **Single-File Executables**: Bundles Python + dependencies into `.exe` (Windows) or `.app` (macOS)
+- **Cross-Platform**: Same spec file works on all platforms
+- **PySide6 Support**: Automatic detection of Qt plugins
+- **Code Signing Compatible**: Supports macOS notarization, Windows Authenticode
+- **GPL License** (with distribution exceptions): Allows proprietary apps
 
 **Installation**:
 ```bash
@@ -346,25 +429,18 @@ pyinstaller PlantLeaf.spec
 - **Windows**: `dist/PlantLeaf.exe` (~120 MB)
 - **macOS**: `dist/PlantLeaf.app` (~140 MB)
 
-**Alternatives Considered**:
-- **cx_Freeze**: Less mature, fewer examples
-- **Nuitka**: Compiles Python to C, but complex setup and larger binaries
-- **Py2App** (macOS only): Platform-specific, not cross-platform
-
-**Decision**: PyInstaller's maturity and PySide6 compatibility made it the safest choice for distribution.
-
 ---
 
 ## UI Enhancements
 
-### 8. Custom Theming System
+### 12. Custom Theming System
 
 **Implementation**: CSS-like stylesheets for Qt
 
 **Why Custom Themes?**
-- ✅ **User Preference**: Dark mode for low-light labs, light mode for presentations
-- ✅ **Color Schemes**: Amber (warm), Blue (cool), Green (plant-themed)
-- ✅ **Accessibility**: High contrast options
+- **User Preference**: Dark mode for low-light labs, light mode for presentations
+- **Color Schemes**: Amber (warm), Blue (cool), Green (plant-themed)
+- **Accessibility**: High contrast options
 
 **Theme Files** (`themes/`):
 ```
@@ -398,28 +474,25 @@ QPushButton:hover {
 }
 ```
 
-**Loading Themes**:
-```python
-def load_theme(theme_name):
-    theme_path = os.path.join(AppConfig.THEMES_DIR, f"{theme_name}.css")
-    with open(theme_path, 'r') as f:
-        stylesheet = f.read()
-    app.setStyleSheet(stylesheet)
-```
+**Themes are managed by theme_manager.py**:
 
 ---
 
 ## Summary Table
 
-| Library | Version | License | Purpose | Alternative? |
-|---------|---------|---------|---------|--------------|
-| **Python** | 3.8+ | PSF | Core language | ❌ No |
-| **PySide6** | 6.9.0 | LGPL v3 | GUI framework | PyQt6 (GPL) |
-| **PyQtGraph** | Latest | MIT | Real-time plotting | Matplotlib (too slow) |
-| **NumPy** | Latest | BSD | Numerical arrays | ❌ No |
-| **SciPy** | Latest | BSD | Signal processing | Custom (not recommended) |
-| **PySerial** | Latest | BSD | USB communication | PyUSB (complex) |
-| **PyInstaller** | Latest | GPL | Deployment | cx_Freeze (less mature) |
+| Library | Version | License | Purpose | Used in |
+|---------|---------|---------|---------|---------|
+| **Python** | 3.8+ | PSF | Core language | App + scripts |
+| **PySide6** | 6.9.0 | LGPL v3 | GUI framework | App |
+| **PyQtGraph** | Latest | MIT | Real-time plotting | App |
+| **NumPy** | Latest | BSD | Numerical arrays | App + scripts |
+| **SciPy** | Latest | BSD | Signal processing | App + scripts |
+| **scikit-learn** | 1.6.1 | BSD | SVM training & inference | App (Stage 3) + scripts |
+| **joblib** | 1.5.3 | BSD | Model serialisation | App (Stage 3) + scripts |
+| **pandas** | 2.3.3 | BSD | CSV I/O & data manipulation | ML scripts only |
+| **matplotlib** | 3.9.4 | BSD | Offline click-distribution plots | ML scripts only |
+| **PySerial** | Latest | BSD | USB communication | App |
+| **PyInstaller** | Latest | GPL | Deployment packaging | Build only |
 
 ---
 
@@ -435,7 +508,6 @@ All libraries used in PlantLeaf comply with open-source licenses compatible with
 - PySide6 libraries are **dynamically linked** (not compiled into executable)
 - Users can replace PySide6 libraries with compatible versions
 - Original PySide6 source code available at: [https://code.qt.io/cgit/pyside/pyside-setup.git/](https://code.qt.io/cgit/pyside/pyside-setup.git/)
-- See [README.txt](README.txt) for full LGPL compliance statement
 
 ---
 
@@ -450,6 +522,6 @@ All libraries used in PlantLeaf comply with open-source licenses compatible with
 
 ---
 
-**Last Updated**: March 11, 2026  
+**Last Updated**: June 2026  
 **Author**: Tommaso Vaninetti  
-**Version**: 1.0
+**Version**: 1.1

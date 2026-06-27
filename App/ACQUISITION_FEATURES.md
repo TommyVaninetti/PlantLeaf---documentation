@@ -1,11 +1,11 @@
-# 📡 Acquisition Features Guide
+# Acquisition Features Guide
 
 ## Overview
 
 PlantLeaf supports two distinct acquisition modes for plant bioacoustics and electrophysiology research:
 
 1. **Audio Mode**: Ultrasonic click detection (20-80 kHz)
-2. **Voltage Mode**: Action potential monitoring (50Hz - 1kHz)
+2. **Voltage Mode**: Action potential monitoring (0-500 Hz)
 
 Both modes provide real-time visualization, automated detection, and long-duration recording capabilities.
 
@@ -13,18 +13,18 @@ Both modes provide real-time visualization, automated detection, and long-durati
 
 ## Audio Mode - Ultrasonic Click Acquisition
 
-### 🎯 Purpose
+### Purpose
 
 Capture and analyze ultrasonic sounds emitted by plants under stress conditions (e.g., drought, mechanical damage). These clicks typically occur in the 20-80 kHz range and last 0.1-5 milliseconds.
 
-### 🔧 Hardware Requirements
+### Hardware Requirements
 
 - **Microphone**: Knowles SPU0410LR5H-QB MEMS ultrasonic microphone
 - **ADC**: 12-bit, 200 kHz sampling rate (STM32F411CEU6 microcontroller)
 - **FFT Engine**: CMSIS-DSP library (ARM Cortex-M4 hardware acceleration)
 - **Connection**: USB CDC (virtual COM port)
 
-### 📊 Technical Specifications
+### Technical Specifications
 
 | Parameter | Value | Notes |
 |-----------|-------|-------|
@@ -50,14 +50,12 @@ Capture and analyze ultrasonic sounds emitted by plants under stress conditions 
 
 ### 2. Configure Serial Port
 
-**Action**: Click **Serial Port** icon (toolbar)
-
 **Dialog Options**:
 - **Port List**: Automatically detects available USB CDC devices
 - **Baud Rate**: 115200 (nominal, actual USB CDC speed is 12 Mbps)
 - **Timeout**: 1 second
 
-**Typical Port Names (without driver installed)**:
+**Typical Port Names**:
 - macOS: `/dev/tty.usbmodem123456`
 - Windows: `COM3`, `COM4`, etc.
 - Linux: `/dev/ttyACM0`
@@ -83,6 +81,7 @@ Capture and analyze ultrasonic sounds emitted by plants under stress conditions 
 - **Timestamp**: Elapsed time since start (MM:SS.mmm)
 - **Peak Frequency**: Frequency bin with maximum amplitude
 - **Peak Magnitude**: Maximum value in current frame
+- **Click Count**: Number of detected clicks (based on threshold)
 
 ### 5. Monitor Click Events
 
@@ -131,18 +130,18 @@ Example (1 minute):
 
 ## Voltage Mode - Action Potential Acquisition
 
-### 🎯 Purpose
+### Purpose
 
 Monitor slow electrical signals in plants (action potentials, variation potentials). These signals indicate plant responses to stimuli (light, touch, wounding).
 
-### 🔧 Hardware Requirements
+### Hardware Requirements
 
 - **Electrodes**: Ag/AgCl surface electrodes or microelectrodes
 - **Amplifier**: Differential amplifier (optional, depends on signal strength)
 - **ADC**: 12-bit, up to 1 kHz sampling rate (STM32F411CEU6 microcontroller)
 - **Connection**: USB CDC (virtual COM port)
 
-### 📊 Technical Specifications
+### Technical Specifications
 
 | Parameter | Value | Notes |
 |-----------|-------|-------|
@@ -150,6 +149,7 @@ Monitor slow electrical signals in plants (action potentials, variation potentia
 | Microcontroller | STM32F411CEU6 | USB CDC, same as audio mode |
 | ADC Resolution | 12-bit | 0.8 mV quantization step |
 | Voltage Range | 0 – 3.3 V | ±1.65 V with DC offset removal |
+| Bandwidth | DC – 500 Hz | Low-pass filtered |
 | Data Rate | up to 4 kB/s | 4 bytes/sample × sampling rate |
 
 ---
@@ -190,6 +190,7 @@ Monitor slow electrical signals in plants (action potentials, variation potentia
 - **Buffer**: Last 60,000 samples kept in memory for the rolling plot view
 
 #### Rolling Window
+- **Duration**: Last ~2 minutes visible at 500 Hz (configurable via time window toggle)
 - **Auto-Scroll**: New data appears on right, old data scrolls left
 
 ### 5. Save Data
@@ -216,7 +217,7 @@ Monitor slow electrical signals in plants (action potentials, variation potentia
 **Solutions**:
 1. Check physical connections
 2. Verify device power LED is on
-3. Install STM32 USB CDC driver, but note that it's not required nor with macOS/Linux nor Windows:
+3. Install STM32 USB CDC driver:
    - Windows: [ST VCP Driver](https://www.st.com/en/development-tools/stsw-stm32102.html)
    - macOS/Linux: Built-in kernel driver (no installation needed)
 
@@ -285,7 +286,6 @@ sudo usermod -aG dialout $USER
 **Audio Mode**:
 - [ ] Microphone within 10 cm of plant
 - [ ] No ultrasonic noise sources nearby (motors, speakers)
-- [ ] Room temperature stable (20-25°C)
 - [ ] Test recording: 30 seconds to verify signal quality
 - [ ] Check mean energy μ and σ in the Click Detector dialog after loading a test file
 
@@ -293,7 +293,6 @@ sudo usermod -aG dialout $USER
 - [ ] Electrodes properly attached (skin contact gel if needed)
 - [ ] Reference electrode on soil or stem base
 - [ ] Wires shielded from noise
-- [ ] Ground loop avoided (single ground point)
 - [ ] Baseline voltage stable for 60 seconds
 
 ### 2. During Recording
@@ -320,7 +319,7 @@ sudo usermod -aG dialout $USER
 
 ### Audio Mode Benchmarks
 
-**Test System**: MacBook Pro M1, 16 GB RAM, macOS 13 ; Custom Thinkpad
+**Test System**: MacBook Pro M1, 16 GB RAM, macOS 13
 
 | Metric | Value |
 |--------|-------|
@@ -375,6 +374,5 @@ Both modes use **lossless binary formats**:
 
 ---
 
-**Last Updated**: March 11, 2026  
+**Last Updated**: June, 2026  
 **Author**: Tommaso Vaninetti  
-**Version**: 1.0

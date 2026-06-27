@@ -1,28 +1,28 @@
-# PlantLeaf Documentation
+# PlantLeaf Desktop Application
 
-![Version](https://img.shields.io/badge/version-1.0.0--beta-blue.svg)
+[![Version](https://img.shields.io/badge/version-1.0.0--beta-blue.svg)](https://github.com/TommyVaninetti/PlantLeaf-Desktop-App)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-AGPLv3-green.svg)](https://www.gnu.org/licenses/agpl-3.0.html)
 [![PySide6](https://img.shields.io/badge/PySide6-6.9.0-green.svg)](https://doc.qt.io/qtforpython/)
 
-**PlantLeaf** is a powerful desktop application specifically designed for **plant bioacoustics and bioelectric research**, enabling real-time acquisition and analysis of ultrasonic click events and voltage signals (action potentials) in plants.
-All the source code is available under AGPLv3 licence at [PlantLeaf-Desktop-App](https://github.com/TommyVaninetti/PlantLeaf-Desktop-App). We appreciate any form of help!
+**PlantLeaf** is a desktop application designed for **plant bioacoustics and bioelectric research**, enabling real-time acquisition and analysis of ultrasonic click events and voltage signals (action potentials) in plants. All source code is available under the AGPLv3 licence at [PlantLeaf-Desktop-App](https://github.com/TommyVaninetti/PlantLeaf-Desktop-App).
 
 ---
 
 ## Overview
 
-PlantLeaf bridges the gap between rigorous scientific analysis and creative exploration, providing:
+PlantLeaf bridges the gap between rigorous scientific analysis and accessible tooling, providing:
 
-- **Ultrasonic Click Detection**: Capture and analyze plant-emitted ultrasonic clicks (20-80 kHz) with sub-millisecond temporal resolution
-- **Action Potential Monitoring**: High-precision voltage acquisition for detecting plant electrical signals
-- **Real-Time Acquisition**: Live monitoring with FFT spectrum visualization (390.625 FPS) for audio and up to 1k sampling rate for bioelectric signals
-- **Advanced Analysis Tools**: Phase-preserving FFT, inverse FFT reconstruction, click detection algorithms, microphone normalization, automatic fitting for action potential
-- **Cheap Instrumentation**: Custom hardware designed to be both cheap and scientifically rigorous 
+- **Ultrasonic Click Detection**: capture and analyze plant-emitted ultrasonic clicks (20–80 kHz) with sub-millisecond temporal resolution
+- **Action Potential Monitoring**: high-precision voltage acquisition for plant electrical signals
+- **Real-Time Acquisition**: live FFT spectrum visualization at 390.625 FPS for audio and up to 1 kHz sampling for bioelectric signals
+- **Machine Learning Pipeline**: SVM classifier (v5) trained on 17 hand-crafted acoustic features for high-recall click detection
+- **Advanced Analysis Tools**: phase-preserving FFT, inverse FFT reconstruction, microphone normalization, automatic curve fitting for voltage signals
 
 ### Scientific Capabilities
 
-- **Frequency Range**: 20-80 kHz (ultrasonic band optimized for SPU0410LR5H-QB microphone)
-- **Sampling Rate**: 200 kHz (Audio) / 50Hz-1kHz (Voltage)
+- **Frequency Range**: 20–80 kHz (ultrasonic band, SPU0410LR5H-QB microphone)
+- **Sampling Rate**: 200 kHz (audio) / 50 Hz–1 kHz (voltage)
 - **FFT Resolution**: 512 samples, 390.625 Hz/bin
 - **Phase Preservation**: 8-bit quantized phase data for iFFT reconstruction
 - **Temporal Resolution**: 2.56 ms frame duration, 5 μs sub-frame localization
@@ -36,218 +36,231 @@ This repository focuses on:
 - **software and firmware** developed by **Tommaso Vaninetti**
 - **hardware** developed by **Abdoellah El Makkaoui**
 
+---
+
 ## Key Features
 
 ### Real-Time Acquisition
 
 #### Audio Mode (Ultrasonic Clicks)
-- **512-sample FFT** at 390 FFTs per second for real-time spectral analysis
-- **Live spectrum visualization** (20-80 kHz bandpass)
+- **512-sample FFT** at 390 FPS for real-time spectral analysis
+- **Live spectrum visualization** (20–80 kHz bandpass)
 - **Phase data preservation** for inverse FFT reconstruction
-- **Automatic click detection** with adjustable thresholds
-- **Long-duration recording** (hours) with minimal memory footprint
+- **Adaptive click detection** with real-time Stage 1 threshold display
+- **Long-duration recording** (hours) with multi-level memory architecture
 
 #### Voltage Mode (Action Potentials)
-- **High-precision ADC** (12-bit, 0-3.3V range)
+- **High-precision ADC** (12-bit, 0–3.3 V range)
 - **Variable sampling rates** (up to 1 kHz)
-- **Low-pass filtering and notch**
+- **Low-pass filtering and notch filter**
 - **Event annotation** with timestamps
 - **CSV export** for external analysis
 
-### Advanced Analysis Tools
+---
 
-**ULTRASONIC CLICKS**
+### Ultrasonic Click Detection Algorithm — v5
 
-#### FFT Spectrum Analysis
+The current version uses a 4-stage pipeline:
+
+| Stage | Description |
+|-------|-------------|
+| Stage 1 | Adaptive energy threshold: frame energy > k × Ê_floor (AdaptiveNoiseEstimatorV5) |
+| Stage 2 | Hard gates: R² ≥ 0.10 (exponential decay quality) and SPR < 100 (broadband shape) |
+| Stage 3 | SVM classifier on 16 acoustic features (RBF kernel, threshold = 0.220 for recall ≥ 0.90) |
+| Stage 4 | Deduplication: merge consecutive detections, keep strongest |
+
+The SVM (scikit-learn `Pipeline`: `SimpleImputer → StandardScaler → SVC`) was trained with session-level cross-validation (`StratifiedGroupKFold`) on 285 labeled candidates (91 clicks, 38 sessions, 4 plant species). AUC-ROC = 0.835; Set B recall = 0.962.
+
+For the full algorithm specification, feature definitions, training protocol, and evaluation results, see [CLICK_DETECTION_ALGORITHM_v5.md](App/Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v5.md).
+
+---
+
+### Audio Replay and Analysis
+
+- **FFT Spectrum View**: frame-by-frame spectrum (20–80 kHz), normalized or raw, with per-frame color coding
+- **Time-Domain Energy View**: FFT energy [V²] over time with adaptive threshold curve (k × Ê_floor) and noise floor overlay
+- **Stage 1 Filter**: interactive k spinbox; "Above Threshold" table shows real-time candidates grouped by energy bursts
+- **iFFT Window**: reconstructed time-domain signal (512 samples, 2.56 ms) with Hilbert envelope, exponential fit overlay, and full 17-feature Analyze Decay dialog
+- **Data Collection Export**: batch export of Stage 1 survivors across multiple recordings as CSV (17 features + label column) and two-panel PNG screenshots for manual labeling
+
+---
+
+### FFT Spectrum Analysis
+
 - **Magnitude + Phase** complex spectrum display
-- **50% Conservative Normalization** for SPU0410LR5H-QB microphone response correction
-- **Frequency-domain filtering** (Tukey window, 10% taper)
-- **Spectral energy plots** with logarithmic scale
+- **50% Conservative Normalization** for SPU0410LR5H-QB frequency response correction (±2.9 dB, 95% confidence)
+- **Gibbs artifact suppression**: Tukey taper applied internally to the complex spectrum before iFFT
+- **FFT Parameters**: Analysis menu shows SPR, R_spectral, FPE for the current frame (always on normalized data, matching SVM inputs)
 
-#### Inverse FFT (iFFT) Reconstruction
-- **Time-domain reconstruction** from complex spectrum (magnitude + phase)
-- **Sub-frame temporal localization** (5 μs resolution)
-- **Gibbs artifact mitigation** using Tukey windowing on complex spectrum
-- **Dual-view comparison**: Raw vs. Normalized waveforms
+---
 
-#### Click Detection Algorithm (still in active development)
-- **Multi-parameter detection**: Amplitude, duration, frequency content
-- **Adaptive thresholding** based on background noise estimation
-- **False-positive suppression** using spectral coherence analysis
-- **Batch processing** for entire recordings
-- **Version v5 is currently under development**
-
-**BIOELECTRIC REACTION**
-
-### Mathematical Analysis & Automatic Fitting for Voltage Signals
+### Mathematical Analysis and Automatic Fitting for Voltage Signals
 
 A dedicated analysis module allows quantitative characterization of plant electrical signals:
 
 #### Automatic Signal Classification
-- **Auto-detection** of signal type from shape: Exponential Return vs. Action Potential
-- Based on peak structure, rebound ratio, and temporal ordering of events
-- 3σ baseline noise threshold for robust detection
+- Auto-detection of signal type: Exponential Return vs. Action Potential
+- Detection criteria: peak structure, rebound ratio (≥ 30% triggers Action Potential), peak ordering, 3σ baseline threshold
 
 #### Exponential Return Model (Variation Potential)
 Fitted to the decay phase from the peak:
 ```
 V(t) = A · exp(-(t - t₀) / τ) + V_baseline
 ```
-- Extracts: amplitude `A`, time constant `τ`, peak time `t₀`, baseline `V_baseline`
-- Physical meaning: membrane relaxation after mechanical/hydraulic stimulus
+Extracts: A (amplitude), τ (time constant), t₀ (peak time), V_baseline (resting potential).
 
 #### Action Potential Model (Composite Piecewise)
-A physiologically motivated two-phase model:
 ```
 V(t) = A_sin · sin(2πf(t-t₀) + φ)        for t < t_peak   [depolarization]
 V(t) = A_exp · exp(-(t-t_peak)/τ) + Vb    for t ≥ t_peak   [repolarization]
 ```
-- Extracts: 7 parameters (amplitude, frequency, phase, time constant, baseline)
-- Physical meaning: fast oscillatory depolarization + exponential repolarization
+Extracts 7 parameters across the depolarization and repolarization phases.
 
 #### Fitting Engine
-- **Library**: `scipy.optimize.curve_fit` (Levenberg-Marquardt / Trust Region Reflective)
-- **Bounds**: Dynamically derived from signal amplitude range
-- **Initial guess**: Auto-estimated from signal shape (63.2% criterion for τ)
-- **R² coefficient**: Goodness-of-fit metric, displayed in real-time
-- **Manual tuning**: All parameters adjustable via spinboxes with live curve update
+- `scipy.optimize.curve_fit` (Levenberg–Marquardt / Trust Region Reflective)
+- Bounds derived dynamically from signal amplitude range
+- Initial parameters auto-estimated from signal shape (63.2% criterion for τ)
+- R² goodness-of-fit updated in real time; warning shown if R² < 0
 
-#### Signal Energy
-- Numerical integration of `(V - V_baseline)²` over event duration (trapezoidal rule)
-- Reported per phase (rising, decay) and total
-
-#### Save & Export
-- Named analyses saved within the `.pvoltage` file
-- Export to CSV (time, measured voltage, fitted curve, residuals)
-- Full parameter report for publication
+#### Save and Export
+- Named analyses saved as JSON in the footer of the `.pvoltage` file without overwriting signal data
+- Multiple analyses per file, each identified by UUID
+- Export to CSV: time, measured voltage, fitted curve, residuals
 
 ---
 
 ## Technology Stack
 
 ### Core Technologies
-- **Python 3.8+**: Application logic
-- **PySide6 (Qt 6.9)**: Cross-platform GUI framework
-- **PyQtGraph**: High-performance real-time plotting
-- **NumPy + SciPy**: Scientific computing and signal processing
+- **Python 3.8+**: application logic
+- **PySide6 6.9.0**: cross-platform GUI framework (LGPL v3)
+- **PyQtGraph**: high-performance real-time plotting (MIT)
+- **NumPy + SciPy**: scientific computing and signal processing (BSD)
+
+### Machine Learning (offline analysis)
+- **scikit-learn 1.6.1**: SVM Pipeline training and inference (BSD)
+- **joblib 1.5.3**: model serialisation / `.pkl` loading (BSD)
+- **pandas 2.3.3**: CSV I/O and feature aggregation in ML scripts (BSD)
+- **matplotlib 3.9.4**: offline click-distribution plots (BSD, Agg backend)
 
 ### Hardware Interface
-- **PySerial**: USB CDC communication with STM32 microcontroller
+- **PySerial**: USB CDC communication with STM32 microcontroller (BSD)
 - **Custom binary protocol**: 770 bytes/frame (154 bins × 5 bytes)
 
 ### Firmware
 - **STM32 HAL**: ARM Cortex-M4 microcontroller
-- **CMSIS-DSP**: Hardware-accelerated FFT (`arm_rfft_fast`)
-- **USB CDC**: Virtual COM port for data streaming
+- **CMSIS-DSP**: hardware-accelerated FFT (`arm_rfft_fast`)
+- **USB CDC**: virtual COM port for data streaming
 
-**Detailed library rationale**: See [LIBRARIES.md](App/LIBRARIES.md)
+**Detailed library rationale**: see [LIBRARIES.md](App/LIBRARIES.md)
 
 ---
-
-## Source Code
-- **[PlantLeaf-Desktop-App](https://github.com/TommyVaninetti/PlantLeaf-Desktop-App). All the source code is available here.**
 
 ## Documentation
 
 ### User Guides
-- **[NORMALIZATION_USER_GUIDE.md](App/NORMALIZATION_USER_GUIDE.md)**: How to use the microphone normalization feature
-- **[ACQUISITION_FEATURES.md](App/ACQUISITION_FEATURES.md)**: Complete guide to real-time acquisition modes
-- **[ANALYSIS_FEATURES.md](App/ANALYSIS_FEATURES.md)**: Advanced analysis tools and workflows
+- **[ACQUISITION_FEATURES.md](App/ACQUISITION_FEATURES.md)**: complete guide to real-time acquisition modes
+- **[ANALYSIS_FEATURES.md](App/ANALYSIS_FEATURES.md)**: advanced analysis tools and workflows
 
 ### Technical Specifications
-- **[FFT_PHASE_TECHNICAL_SPECIFICATION.md](App/FFT_and_acquisition_specifications/FFT_PHASE_TECHNICAL_SPECIFICATION.md)**: Mathematical foundation of FFT/iFFT processing
-- **[MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md](App/normalization_feature/MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md)**: Error analysis and validation (±2.9 dB accuracy)
-- **[CLICK_DETECTION_ALGORITHM_v4.md](App/Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v4.md)**: Automatic click detector information v4
-- **[CLICK_DETECTION_ALGORITHM_v5.md](App/Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v5.md)**: Automatic click detector information v5
-- **[VOLTAGE_HARDWARE.md](Hardware/VOLTAGE_HARDWARE.md)**: Detailed info about the ESEB board
-- **[AUDIO_HARDWARE.md](Hardware/AUDIO_HARDWARE.md)**: Detailed info about ASEB board
+- **[FFT_PHASE_TECHNICAL_SPECIFICATION.md](App/FFT_PHASE_TECHNICAL_SPECIFICATION.md)**: mathematical foundation of FFT/iFFT processing
+- **[MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md](App/MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md)**: error analysis and validation (±2.9 dB)
+- **[CLICK_DETECTION_ALGORITHM_v4.md](App/Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v4.md)**: click detection algorithm v4 (historical)
+- **[CLICK_DETECTION_ALGORITHM_v5.md](App/Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v5.md)**: click detection algorithm v5 (current)
+- **[AUDIO_HARDWARE.md](Hardware/AUDIO_HARDWARE.md)**: ASEB board design and specifications
+- **[VOLTAGE_HARDWARE.md](Hardware/VOLTAGE_HARDWARE.md)**: ESEB board design and specifications
 
 ### Architecture
-- **[LIBRARIES.md](App/LIBRARIES.md)**: Justification for technology choices
-
-### Website and Database
-- **[WEBSITE-DATABASE.md](App/WEBSITE-DATABASE.md)**: Sharing of scientific documentation
+- **[LIBRARIES.md](App/LIBRARIES.md)**: justification for all technology choices
 
 ---
 
-## Scientific Validation for Acoustic Signals
+## Technical Highlights
+
+| Feature | Specification |
+|---------|--------------|
+| Sampling Rate | 200 kHz (audio) / 50 Hz–1 kHz (voltage) |
+| FFT Size | 512 samples (radix-2 Cooley-Tukey) |
+| Frequency Range | 20–80 kHz (ultrasonic) |
+| Phase Quantization | 8-bit signed (−127 to +127) |
+| Data Throughput | 2.4 Mbps (USB CDC) |
+| File Format | Custom binary (`.paudio` / `.pvoltage`) |
+| SVM Features | 16 (17 computed, fit_coverage excluded from model) |
+| SVM AUC-ROC | 0.835 |
+| Platform Support | Windows, macOS, Linux |
+
+---
+
+## Scientific Validation
 
 ### Published Research Context
-This tool was developed following methodologies from:
-- **Khait et al. (2023)**: *Sounds emitted by plants under stress are airborne and informative*. Cell, 186(7), 1328-1336.
+- **Khait et al. (2023)**: *Sounds emitted by plants under stress are airborne and informative*. Cell, 186(7), 1328–1336.
 
 ### Error Budget
 - **Amplitude accuracy**: ±2.9 dB (95% confidence) after normalization
 - **Phase accuracy**: 0.41° RMS (8-bit quantization)
-- **Temporal resolution**: 5 μs (sample-level) via iFFT peak detection
+- **Temporal resolution**: 5 μs via iFFT peak detection
 - **Frequency resolution**: 390.625 Hz/bin
 
 ### Suitable For
-- ✅ Qualitative spectral analysis
-- ✅ Click presence/absence detection
-- ✅ Temporal pattern analysis
-- ✅ Before/after stimulus comparisons
+- Qualitative spectral analysis
+- Click presence/absence detection
+- Temporal pattern analysis (click rate, clustering)
+- Before/after stimulus comparisons
 
-### NOT Suitable For
-- ❌ Absolute SPL measurements (dB SPL)
-- ❌ Quantitative energy budgets
-- ❌ Cross-microphone comparisons without calibration
+### Not Suitable For
+- Absolute SPL measurements (dB SPL)
+- Quantitative energy budgets
+- Cross-microphone comparisons without calibration
 
 ---
 
-## License & Compliance
+## License and Compliance
 
-### Application License
-The Software is licenced under the **AGPLv3 licence** 
+The software is licensed under the **AGPLv3 licence**.
 
-### Open-Source Components
-This application uses the following open-source libraries:
+Open-source components:
 - **Python**: PSF License
-- **PySide6**: LGPL v3 
+- **PySide6**: LGPL v3
 - **PyQtGraph**: MIT License
+- **NumPy / SciPy / pandas / matplotlib**: BSD License
+- **scikit-learn / joblib**: BSD License
 - **PySerial**: BSD License
-- **NumPy/SciPy**: BSD License
 - **PyInstaller**: GPL (distribution exceptions apply)
 
-### Icons
-**Uicons** by [Flaticon](https://www.flaticon.com/uicons) - Open-source license
+Icons: **Uicons** by [Flaticon](https://www.flaticon.com/uicons) — open-source license
 
 ---
 
 ## Team
 
 **Software & Firmware**: Tommaso Vaninetti  
-**Hardware Design**: Abdoellah El Makkaoui
+**Hardware Design**: Abdoellah El Makkaoui  
 **Web/Database**: Frida Tirari
 
 **Contact**: tommasovaninetti8@gmail.com, abdoellah.elmakkaoui@gmail.com, fridatirari@gmail.com
 
 ---
 
-## Competitions & Recognition
+## Competitions and Recognition
 
-- **FAST i Giovani e le Scienze 2026** - Italian Finals Winners
-- **EUCYS - European Union Contest for Young Scientists 2026** - Final in September 2026
-- **FAST i Giovani e le Scienze 2026** - Italian Finals 1st overall winners
-- Target: European Union Contest for Young Scientists (EUCYS), September 2026
+- **FAST i Giovani e le Scienze 2026** — Italian Finals 1st place overall
+- **EUCYS — European Union Contest for Young Scientists 2026** — final in September 2026
 
 ---
 
 ## Contributing
 
-Our mission is to make this field accessible to everyone.
-We believe that only by creating a community we will be able achieve the best results.
-We are more than happy to collaborate with anyone that is interested, so please don't hesitate to contact us!
+Our mission is to make plant bioacoustics accessible to everyone. We welcome collaboration from anyone interested — open an issue on GitHub or contact us directly.
 
 ---
 
 ## Related Resources
 
-- **Official Website**: [www.plantleaf.it](www.plantleaf.it)
-- **Research Paper**: we're planning to publish our research in the future
+- **Official Website**: [www.plantleaf.it](https://www.plantleaf.it)
+- **Research Paper**: planned for future publication
 
 ---
 
-**Last Updated**: May 22, 2026  
-**Version**: 1.0.0
-**Project Status**: 🟢 Active Development
+**Last Updated**: June 2026  
+**Project Status**: Active Development

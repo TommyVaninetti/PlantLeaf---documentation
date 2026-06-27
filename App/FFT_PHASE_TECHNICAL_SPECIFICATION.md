@@ -1,7 +1,6 @@
 # FFT and Phase Data Technical Specification
 
-**Document Version:** 1.0  
-**Last Updated:** March 7, 2026  
+**Last Updated:** June 2026  
 **Author:** Tommaso Vaninetti
 **Target Audience:** Advanced users, researchers, algorithm developers
 
@@ -15,18 +14,17 @@
 4. [Phase Quantization and Transmission](#phase-quantization-and-transmission)
 5. [Spectral Reconstruction](#spectral-reconstruction)
 6. [Inverse FFT (iFFT) Process](#inverse-fft-ifft-process)
-7. [Windowing and Artifact Mitigation](#windowing-and-artifact-mitigation)
-8. [Error Analysis and Uncertainty Budget](#error-analysis-and-uncertainty-budget)
 
 ---
 
 ## 1. Overview
 
-PlantLeaf audio acquisition system captures ultrasonic signals (20-80 kHz) using a specialized pipeline that performs **real-time FFT analysis** on embedded hardware (STM32/ESP32) and transmits **both magnitude and phase information** to the host computer.
+PlantLeaf audio acquisition system captures ultrasonic signals (20-80 kHz) using a specialized pipeline that performs **real-time FFT analysis** on embedded hardware (STM32F411CEU6) and transmits **both magnitude and phase information** to the host computer.
 
 ### Key Design Decisions
 
 **Why FFT on Hardware?**
+- **More efficient than time signal** sending 200k floats/s is impossible with USB CDC
 - **Real-time processing**: 200 kHz sampling requires ~390 FFT/s (2.56 ms frames)
 - **Bandwidth optimization**: Transmitting 154 bins (20-80 kHz) requires 308 bytes/frame vs 1024 bytes for raw samples
 - **Computational efficiency**: Hardware FFT accelerators (CMSIS-DSP) enable low-latency processing
@@ -68,6 +66,8 @@ PlantLeaf audio acquisition system captures ultrasonic signals (20-80 kHz) using
 - **Non-flat response**: ±9 dB variation across 20-80 kHz band
 - **Measurement uncertainty**: ±0.5 dB (manual datasheet reading)
 
+**The problem was addressed with a conservative normalization. All the information about it are available here: [MICROPHONE_NORMALIZATION_TECHNICAL_REPORT](MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md) **
+
 ### 2.2 ADC Configuration
 
 **Resolution:** 12-bit (4096 levels)  
@@ -75,28 +75,12 @@ PlantLeaf audio acquisition system captures ultrasonic signals (20-80 kHz) using
 **Voltage Range:** 0 - 3.3 V  (offset at 1.65V)
 **Quantization Step:** 3.3V / 4096 = 0.8057 mV  
 
-**Quantization Noise:**
-```
-σ_q = Δ / √12 = 0.8057 mV / √12 ≈ 0.233 mV RMS
-SNR_ADC = 20·log₁₀(2^12 / √12) ≈ 74 dB
-```
-
-**Nyquist Frequency:**
-```
-f_nyq = fs / 2 = 200 kHz / 2 = 100 kHz
-```
-
-**Alias-Free Band:** 20-80 kHz (well below Nyquist)
-
----
-
 ## 3. FFT Implementation Details
 
 ### 3.1 FFT Parameters
 
 | Parameter | Value | Rationale |
 |-----------|-------|-----------|
-| Sampling Frequency (fs) | 200k samples/s | > 2*80k (Nyquist) |
 | FFT Size (N) | 512 samples | Power-of-2 for radix-2 algorithm |
 | Window Duration | 2.56 ms | N/fs = 512/200000 |
 | Frame Rate | 390.625 FPS | fs/N = 200000/512 |
@@ -126,13 +110,12 @@ arm_rfft_fast_f32(&fftHandler, fftBufIn, fftBufOut, 0);  // No windowing
 - **Scalloping Loss:** 3.92 dB (worst case between bins)
 
 **Consequences:**
-- ✅ **Best frequency resolution**: 390.625 Hz/bin (no mainlobe widening)
-- ✅ **Best temporal localization**: 2.56 ms (no envelope spreading)
-- ❌ **High spectral leakage**: -13 dB sidelobes cause strong inter-bin interference
-- ❌ **High scalloping loss**: Up to 3.92 dB amplitude error between bins
+- **Best frequency resolution**: 390.625 Hz/bin (no mainlobe widening)
+- **Best temporal localization**: 2.56 ms (no envelope spreading)
+- **High spectral leakage**: -13 dB sidelobes cause strong inter-bin interference
+- **High scalloping loss**: Up to 3.92 dB amplitude error between bins
 
 **Why No Window Currently?**
-- **Computational simplicity**: Firmware prioritizes real-time performance
 - **Click detection**: Click events are typically broadband (low spectral resolution needed)
 - **Temporal precision**: Rectangular window preserves sharp temporal boundaries
 
@@ -145,11 +128,6 @@ With rectangular window:
 Δf ≈ 390.625 Hz (optimal - single bin)
 Δt · Δf ≈ 1.0 > 1/(4π) ≈ 0.08  ✓
 ```
-
-**Future Enhancement:**
-A Hann window could be added in firmware to reduce spectral leakage (-31.5 dB sidelobes) at the cost of:
-- 2× mainlobe width (781.25 Hz effective resolution)
-- Slightly lower scalloping loss (1.42 dB vs 3.92 dB)
 
 ### 3.3 FFT Algorithm
 
@@ -218,36 +196,6 @@ phase_rad = (phase_int8 / 127.0) * π
 **Maximum Error:**
 ```
 ε_phase = Δφ / 2 = π / 254 ≈ 0.0124 rad ≈ 0.71°
-```
-
-**RMS Error (uniform quantization):**
-```
-σ_phase = Δφ / √12 ≈ 0.0071 rad ≈ 0.41°
-```
-
-**Impact on Reconstructed Signal:**
-
-For a single frequency component:
-```
-x(t) = A·cos(2πft + φ)
-```
-
-With phase error ε:
-```
-x'(t) = A·cos(2πft + φ + ε)
-```
-
-**Amplitude Error (worst case at zero-crossing):**
-```
-|x'(t) - x(t)| ≈ A·|sin(ε)| ≈ A·ε    (for small ε)
-
-With ε_max = 0.0124 rad:
-Relative error ≈ 1.24% of amplitude
-```
-
-**SNR due to Phase Quantization:**
-```
-SNR_phase = -20·log₁₀(ε_rms) ≈ -20·log₁₀(0.0071) ≈ 43 dB
 ```
 
 ### 4.4 Data Transmission Format
@@ -324,6 +272,7 @@ Spectral discontinuities introduce **Gibbs phenomenon** in time domain:
 - **Overshoot:** ~9% of step height
 - **Ringing:** Decays as 1/t
 - **Duration:** ~2-3 oscillations per transition
+Gibbs suppression is handled by [CLICK_DETECTION_ALGORITHM_v5](Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v5.md) and descibed in section 7 below
 
 **Example:**
 
@@ -379,33 +328,6 @@ Resolution: Δt = 1/fs = 5 μs (single sample)
 - **Sub-frame (iFFT):** 5 μs (sample-level)
 - **Improvement:** 512× better temporal resolution
 
-### 6.3 Energy Preservation (Parseval's Theorem)
-
-**Frequency Domain Energy:**
-```
-E_freq = Σ(k=0 to N/2) |X[k]|²
-```
-
-**Time Domain Energy:**
-```
-E_time = Σ(n=0 to N-1) |x[n]|²
-```
-
-**Parseval's Relation:**
-```
-E_time = (2/N) · E_freq    (for real signals)
-```
-
-**Verification (Python):**
-```python
-E_freq = np.sum(np.abs(complex_spectrum)**2)
-E_time = np.sum(np.abs(time_domain_signal)**2)
-ratio = E_time * len(complex_spectrum) / (2 * E_freq)
-assert abs(ratio - 1.0) < 1e-6  # Energy conserved
-```
-
----
-
 ## 7. Windowing and Artifact Mitigation
 
 ### 7.1 Tukey Window (Cosine Taper)
@@ -442,45 +364,6 @@ for i in range(15):
     window[204 - i] = 0.5 * (1 - cos(π * alpha))
 ```
 
-**⚠️ CRITICAL IMPLEMENTATION DETAIL:**
-
-The window is applied to the **complex spectrum**, not just magnitudes:
-
-```python
-# ❌ WRONG (causes residual Gibbs artifacts)
-magnitude_windowed = magnitude * window
-complex_spectrum = magnitude_windowed * exp(jφ)
-
-# ✅ CORRECT (eliminates Gibbs artifacts)
-complex_spectrum = magnitude * exp(jφ)
-complex_spectrum_windowed = complex_spectrum * window
-```
-
-**Why This Matters:**
-
-The Gibbs phenomenon arises from **discontinuities in the complex spectrum** (both real and imaginary parts). Windowing only the magnitudes leaves phase discontinuities that create spurious peaks/dips at the start/end of the iFFT signal.
-
-**Mathematical Justification:**
-
-For a complex spectrum X[k] = A[k]·exp(jφ[k]):
-
-```
-Re{X[k]} = A[k]·cos(φ[k])
-Im{X[k]} = A[k]·sin(φ[k])
-```
-
-At spectral edges (bins 51, 204), we have discontinuities:
-- Before window: X[50] = 0, X[51] = A·exp(jφ)
-- If we window only A: X[51] = 0.5A·exp(jφ) ← still a phase jump!
-- If we window X[k]: X[51] = 0.5·A·exp(jφ) ← smooth transition in Re{X} and Im{X}
-
-**Windowed Spectrum:**
-```python
-complex_spectrum_windowed = complex_spectrum * window_full
-```
-
-where `window_full` is a 256-bin array with tapers at bins 51-65 and 190-204.
-
 ### 7.2 Window Properties
 
 **Minimum Gain:** 0.5 (-6 dB) at edges (bins 51, 204)
@@ -501,213 +384,9 @@ Practical: (2 × 15 bins) / 154 bins × 50% ≈ 9.7% energy reduction
 | Ringing Amplitude | -20 dB | -40 dB | +20 dB SNR |
 | Temporal Artifacts | Visible | Negligible | 10× cleaner |
 
-### 7.3 Impact on Click Detection
-
-**Affected Frequency Ranges:**
-- **Low taper:** 20.0-25.5 kHz (attenuated 0.5-1.0×)
-- **High taper:** 73.8-80.0 kHz (attenuated 0.5-1.0×)
-
-**Typical Click Spectra:**
-- **Bat echolocation:** 40-60 kHz (central plateau, gain = 1.0) ✓
-- **Low-frequency clicks:** 20-30 kHz (partial attenuation ≤ -3 dB) ⚠️
-- **High-frequency clicks:** >70 kHz (partial attenuation ≤ -3 dB) ⚠️
-
-**Detection Sensitivity:**
-```
-SNR_detection = SNR_signal + 20·log₁₀(window_gain)
-
-Worst case (bin 51 or 204):
-SNR_detection = SNR_signal - 6 dB
-
-For SNR_signal = 20 dB (typical click):
-SNR_detection = 14 dB (still detectable) ✓
-```
-
 ---
 
-## 8. Error Analysis and Uncertainty Budget
-
-### 8.1 Individual Error Sources
-
-| Error Source | Type | Magnitude | Impact Domain |
-|--------------|------|-----------|---------------|
-| ADC Quantization | Uniform | 0.233 mV RMS | Amplitude |
-| Phase Quantization | Uniform | 0.41° RMS | Phase/Time |
-| Microphone Response | Systematic | ±9 dB (20-80 kHz) | Amplitude |
-| FFT Windowing (Rectangular) | Scalloping | **3.92 dB max** | Amplitude |
-| Spectral Leakage | Systematic | -13 dB sidelobes | Frequency domain |
-| Tukey Windowing | Edge attenuation | 0-6 dB | Amplitude (edges only) |
-| Gibbs Artifact | Residual ringing | <1% amplitude | Time domain |
-| Thermal Noise | White noise | 64 dB SNR | Amplitude |
-
-### 8.2 Combined Amplitude Uncertainty
-
-**Random Errors (RSS):**
-```
-σ_random = √(σ_ADC² + σ_thermal²)
-
-σ_ADC = 0.233 mV
-σ_thermal ≈ 0.1 mV (estimated from SNR spec)
-
-σ_random ≈ √(0.233² + 0.1²) ≈ 0.254 mV
-```
-
-**Systematic Errors (Linear Sum - Worst Case):**
-```
-ε_systematic = ε_mic + ε_window + ε_tukey
-
-ε_mic = ±9 dB (microphone response variation)
-ε_window = +3.92 dB (scalloping loss, rectangular window worst case)
-ε_tukey = 0 to -6 dB (edge bins only)
-
-Worst case (edge bin): ±9 + 3.92 + 6 = 18.92 dB
-Typical (center): ±9 + 3.92 = 12.92 dB
-```
-
-### 8.3 Phase/Temporal Uncertainty
-
-**Phase Error:**
-```
-σ_phase = 0.41° RMS = 0.0071 rad
-```
-
-**Temporal Error (from phase):**
-
-For a frequency component at f:
-```
-Δt_phase = σ_phase / (2πf)
-
-At 40 kHz (typical click):
-Δt_phase = 0.0071 / (2π × 40000) ≈ 28 ns
-
-At 60 kHz:
-Δt_phase ≈ 19 ns
-```
-
-**Frame Synchronization:**
-```
-Frame boundary uncertainty: ±Δt_frame = ±(frame_duration / 2)
-                           = ±1.28 ms
-
-Sub-frame localization: ±Δt_sample = ±(1 / fs) = ±5 μs
-```
-
-### 8.4 iFFT Reconstruction Accuracy
-
-**Energy Conservation:**
-```
-Error_Parseval = |E_time - (2/N)·E_freq| / E_time < 10⁻⁶
-```
-
-**Amplitude Fidelity:**
-
-After inverse FFT, signal reconstruction error:
-```
-SNR_reconstruction = 1 / √(σ_phase² + σ_Gibbs²)
-
-σ_phase ≈ 0.0071 rad → -43 dB contribution
-σ_Gibbs ≈ 0.01 (with Tukey) → -40 dB contribution
-
-SNR_reconstruction ≈ 37 dB (typical)
-```
-
-### 8.5 Total Uncertainty Budget (95% Confidence)
-
-**Amplitude Measurements (20-80 kHz):**
-
-| Frequency Range | Random (2σ) | Systematic | Combined (RSS) |
-|-----------------|-------------|------------|----------------|
-| 25-75 kHz (plateau) | ±0.5 mV | ±12.9 dB | ±12.9 dB |
-| 20-25 kHz (low taper) | ±0.5 mV | ±15.9 dB | ±15.9 dB |
-| 75-80 kHz (high taper) | ±0.5 mV | ±15.9 dB | ±15.9 dB |
-
-**Temporal Measurements:**
-
-| Parameter | Uncertainty (95%) | Source |
-|-----------|-------------------|--------|
-| Frame timestamp | ±1.28 ms | Frame duration |
-| Peak localization (iFFT) | ±20 μs | Phase quantization + sampling |
-| Click duration | ±10 μs | Sample resolution (2× samples) |
-
-### 8.6 Normalization Correction (50% Conservative)
-
-**Microphone Response Correction:**
-```
-Gain_corrected[f] = 10^(-mic_response_dB[f] × 0.5 / 20)
-
-At 25 kHz (peak):  Gain = 10^(-10.5 × 0.5 / 20) = 0.71 (-3.0 dB)
-At 60 kHz (valley): Gain = 10^(-(-7.0) × 0.5 / 20) = 1.26 (+2.0 dB)
-```
-
-**Residual Error (After 50% Correction):**
-```
-Uncorrected error: ±9 dB
-50% correction reduces to: ±4.5 dB (50% remaining)
-
-With measurement uncertainty (±0.5 dB):
-ε_corrected = √((4.5)² + (0.5)²) ≈ ±4.5 dB
-
-Conservative estimate: ±5 dB (rounded)
-```
-
-**When to Use Normalization:**
-- ✓ Relative spectral comparisons
-- ✓ Click frequency characterization
-- ✓ Spectral shape analysis
-- ✗ Absolute SPL measurements (requires full calibration)
-
----
-
-## 9. Summary and Recommendations
-
-### 9.1 Data Quality Metrics
-
-**Signal Integrity:**
-- **Frequency Resolution:** 390.625 Hz/bin (adequate for broadband clicks)
-- **Temporal Resolution:** 5 μs sample-level (excellent for sub-ms clicks)
-- **Phase Fidelity:** 43 dB SNR (sufficient for iFFT reconstruction)
-- **Energy Conservation:** <0.0001% error (excellent)
-
-**Practical Accuracy:**
-- **Amplitude (center band):** ±10.4 dB (95% confidence)
-- **Amplitude (edge bands):** ±13.4 dB (95% confidence)
-- **Temporal Localization:** ±20 μs (95% confidence)
-- **Click Duration:** ±10 μs (95% confidence)
-
-### 9.2 Best Practices for Users
-
-**For Qualitative Analysis:**
-- ✓ Use raw FFT data (no normalization needed)
-- ✓ Rely on relative comparisons (click vs background)
-- ✓ Trust spectral shapes and peak frequencies
-
-**For Quantitative Analysis:**
-- ⚠️ Apply 50% microphone normalization with caution
-- ⚠️ Report uncertainty bounds (±5 dB after correction)
-- ⚠️ Avoid absolute SPL claims without external calibration
-
-**For Temporal Analysis:**
-- ✓ Use iFFT for sub-frame localization (5 μs resolution)
-- ✓ Trust click duration measurements (±10 μs accuracy)
-- ✓ Leverage phase information for multi-frame tracking
-
-### 9.3 Limitations and Future Work
-
-**Current Limitations:**
-1. **Microphone response:** ±9 dB uncorrected, ±5 dB with 50% correction
-2. **Edge attenuation:** 20-25 kHz and 75-80 kHz (Tukey window trade-off)
-3. **Scalloping loss:** Up to 1.42 dB between FFT bins
-4. **No absolute SPL:** Requires full calibration chain
-
-**Potential Improvements:**
-1. **Factory calibration:** Measure individual microphone response
-2. **Adaptive windowing:** Reduce Tukey taper to 5% for edge-frequency clicks
-3. **Interpolation:** Use quadratic interpolation for sub-bin frequency estimation
-4. **Reference microphone:** Enable absolute SPL measurements
-
----
-
-## 10. References
+## 8. References
 
 1. **CMSIS-DSP Library Documentation**, ARM Ltd., v1.10.0
 2. **Knowles SPU0410LR5H-QB Datasheet**, Rev. H, 2023
