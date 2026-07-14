@@ -1,6 +1,6 @@
 # FFT and Phase Data Technical Specification
 
-**Last Updated:** June 2026  
+**Last Updated:** July 2026  
 **Author:** Tommaso Vaninetti
 **Target Audience:** Advanced users, researchers, algorithm developers
 
@@ -26,8 +26,9 @@ PlantLeaf audio acquisition system captures ultrasonic signals (20-80 kHz) using
 **Why FFT on Hardware?**
 - **More efficient than time signal** sending 200k floats/s is impossible with USB CDC
 - **Real-time processing**: 200 kHz sampling requires ~390 FFT/s (2.56 ms frames)
-- **Bandwidth optimization**: Transmitting 154 bins (20-80 kHz) requires 308 bytes/frame vs 1024 bytes for raw samples
+- **Bandwidth optimization**: Transmitting 154 bins (20-80 kHz) requires 785 bytes/frame vs 200k samples/s (800 KB/s as float32) for the raw time signal
 - **Computational efficiency**: Hardware FFT accelerators (CMSIS-DSP) enable low-latency processing
+- **Filtering**: sending only 20-80kHz band already removes low frequencies noise
 
 **Why Preserve Phase Information?**
 - **Time-domain reconstruction**: Enable inverse FFT for temporal analysis (click detection, decay analysis)
@@ -174,47 +175,89 @@ Bin 256: 100 kHz (Nyquist)
 
 ### 4.2 Quantization Formula
 
-**Encoding (Firmware):**
-```c
-int8_t phase_quantized = (int8_t)round((phase_rad / π) * 127.0);
+The phase scale is **128 counts per π radians**, end to end: firmware encoder,
+wire format and host decoder all use it.
 
-Range: [-127, +127] maps to [-π, +π]
+**Encoding (firmware, `fast_atan2.c`):**
+
+The firmware never calls a floating-point `atan2`. It computes the phase
+directly on the quantized scale with an octant-folded lookup table:
+
+1. `(imag, real)` is folded into the first octant via absolute values and a
+   `min/max` ratio ∈ [0, 1], quantized (round-to-nearest) to an index i ∈ [0, 255].
+2. The LUT returns the first-octant angle in counts:
+   ```
+   lut[i] = round( atan(i / 255) · 128 / π )        # 0..32 counts = 0..45°
+   ```
+3. Octant and quadrant reconstruction on the same scale: 90° = 64 counts,
+   quadrant II = `128 − α`, quadrant III = `−128 + α`, quadrant IV = `−α`.
+   The value +128 does not exist in int8; it is exactly +180°, which this
+   scale represents as −128 (the two describe the same angle).
+
+The closed-form equivalent of the encoder is:
+```c
+int8_t phase_quantized = (int8_t)round((phase_rad / π) * 128.0);   // +π wraps to -128
+
+Range: [-128, +127] maps to [-π, +π)
 ```
 
-**Decoding (Host):**
+**Decoding (Host, `click_pipeline_v5.py`):**
 ```python
-phase_rad = (phase_int8 / 127.0) * π
+phase_rad = (phase_int8 / 128.0) * π
 ```
 
 **Quantization Step:**
 ```
-Δφ = 2π / 254 ≈ 0.0247 rad ≈ 1.42°
+Δφ = 2π / 256 ≈ 0.0245 rad ≈ 1.41°
 ```
 
 ### 4.3 Phase Quantization Error
 
-**Maximum Error:**
+**Error budget:**
 ```
-ε_phase = Δφ / 2 = π / 254 ≈ 0.0124 rad ≈ 0.71°
+Output quantization:  ±Δφ / 2 = π / 256 ≈ 0.70°
+LUT index rounding:   ≤ ~0.11°
 ```
+
+**Measured** (dense sweep of the encoder+decoder pair against float64 `atan2`):
+**0.81° worst case, 0.35° mean**, zero systematic bias in any quadrant. On a
+synthetic ultrasonic click (50 kHz carrier, τ = 0.3 ms exponential decay), the
+phase encoding contributes ~0.5% RMS-normalized waveform error and −0.2%
+envelope-peak error after reconstruction; the envelope peak position is
+unaffected. The error is at the floor set by 8-bit phase encoding — reducing
+it further would require widening the phase field in the wire format.
 
 ### 4.4 Data Transmission Format
 
-**Per FFT Frame (154 bins):**
+**Wire format — one frame per FFT (little-endian):**
 
-| Data Type | Bytes per Bin | Total Bytes | Range |
-|-----------|---------------|-------------|-------|
-| Magnitude (float32) | 4 | 616 | 0 to 3.3 V |
-| Phase (int8) | 1 | 154 | -127 to +127 |
-| **Total** | **5** | **770** | |
+| Field | Type | Bytes | Content |
+|-------|------|-------|---------|
+| Sync | uint8 × 2 | 2 | `0xAA 0x55` |
+| Payload length | uint16 | 2 | Always **781** |
+| Max amplitude | float32 | 4 | Peak magnitude in the band [V] |
+| Peak bin | uint16 | 2 | Index of the peak, **relative to bin 51** (0–153) |
+| Above threshold | uint8 | 1 | 1 if max amplitude > threshold |
+| Threshold | float32 | 4 | Active detection threshold [V] |
+| Magnitudes | float32 × 154 | 616 | Bins 51–204, amplitude-normalized [V] |
+| Phases | int8 × 154 | 154 | Bins 51–204, 128 counts per π, −128 to +127 |
+| **Frame total** | | **785** | header 4 + payload 781 |
+
+**Framing invariant:** the payload length field is always 781 for this
+protocol version. The host reader resynchronizes on the byte stream by
+scanning for `0xAA 0x55` and **accepts a candidate header only if its length
+field equals 781** — the sync pair can legitimately occur inside float32
+payload data, so the length check is what makes recovery from a truncated or
+corrupted frame deterministic (within ~2 frames). Frames whose decoded
+content is invalid (non-finite floats, peak bin ≥ 154) are dropped.
 
 **Bandwidth Requirement:**
 ```
-Data rate = 770 bytes/frame × 390.625 FPS = 300.78 KB/s
-Bit rate = 300.78 KB/s × 8 = 2.406 Mbps
+Data rate = 785 bytes/frame × 390.625 FPS = 306.6 KB/s
+Bit rate ≈ 2.45 Mbps
 
 USB 2.0 Full Speed: 12 Mbps available
-Utilization: 2.406 / 12 ≈ 20% ✓
+Utilization: 2.45 / 12 ≈ 20% ✓
 ```
 
 ---
@@ -253,8 +296,9 @@ Utilization: 2.406 / 12 ≈ 20% ✓
 
 4. **Complex Spectrum Construction:**
    ```python
-   phase_rad = (full_phase / 127.0) * π
+   phase_rad = (full_phase / 128.0) * π      # 128 counts per π — see §4.2
    complex_spectrum = full_magnitude * exp(j * phase_rad)
+   complex_spectrum *= (fft_size / 2)        # restore raw-FFT scale — see §6.1
    ```
 
 ### 5.3 Spectral Discontinuities (Gibbs Phenomenon)
@@ -292,12 +336,13 @@ First zero-crossing ≈ 1/(2Δf) ≈ 1.3 ms from edge
 ```
 x[n] = (1/N) · Σ(k=0 to N-1) X[k] · exp(j·2π·k·n/N)
 
-For real signals (using rfft/irfft):
+For real signals (using rfft/irfft), where X[k] are RAW (unnormalized) coefficients:
 x[n] = (2/N) · Σ(k=0 to N/2) |X[k]| · cos(2π·k·n/N + φ[k])
 ```
 
 **Implementation:**
 ```python
+complex_spectrum *= (fft_size / 2)                          # restore raw-FFT scale
 time_domain_signal = np.fft.irfft(complex_spectrum, n=512)
 ```
 
