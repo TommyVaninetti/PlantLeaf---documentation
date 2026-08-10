@@ -433,6 +433,36 @@ FFT frame (154 bins, magnitudes + int8 phases)
          peak_amp = A[peak_idx]
 ```
 
+### 7.1 Stitched Click Context (frame-grid independence)
+
+A cavitation click lasts ≤ ~0.5 ms but it can be borderline, meaning that it happens near the end of the frame. Computing features on a single frame therefore **silently truncates** every time-domain feature of a click that straddles a frame boundary — the decay window index can exceed 511 while the raw-signal array is only 512 long, and NumPy slicing returns a short array instead of raising. This makes `ZCR_post`, `kurtosis`, `centroid_shift_hz` and `asymmetry_integral` frame-alignment dependent.
+v5 removes this by resolving and measuring every candidate on a **stitched context** rather than a single frame:
+
+```
+build_click_context(prev_sig, curr_sig, next_sig):
+    signal   = [ prev | curr | next ]        (up to 1536 samples)
+    envelope = Hilbert(signal)               (continuous across the joins)
+    origin   = index of curr's first sample
+    seams    = sample indices of the frame joins
+
+resolve_click(ctx, noise_floor, std_noise):
+    frame_peak = argmax(envelope over the current frame)   # Stage-1 excursion
+    onset      = last sample below LEVEL, scanning back from frame_peak
+    peak       = argmax(envelope over [onset : onset + 512])  # the TRUE peak
+    decay_start, decay_end = decay window from `peak` on the stitched envelope
+```
+
+All feature functions then receive the stitched `signal`/`envelope` and indices into them, so a decay that crosses a frame boundary addresses real samples on both sides. The envelope is the Hilbert transform of the *stitched* signal (not per-frame envelopes concatenated), so it is continuous; each frame keeps its own Tukey taper, so the joins carry a mild seam whose positions are tracked and drawn honestly rather than hidden.
+
+**Event identity.** The peak's absolute sample and its owning frame define a model-independent identity used by Stage 4:
+
+```
+peak_abs            = frame_idx · 512 + (peak − origin)
+canonical_frame_idx = peak_abs // 512
+```
+
+The two Stage 1 candidates a straddling click produces (one in the frame where it rises, one in the frame where the tail is detected) scan back to the **same onset** and re-maximise to the **same peak**, so they carry an integer-identical `peak_abs`. This is what makes them collapse exactly in Stage 4.
+
 ---
 
 ## 8. Stage 3 – Multi-Criterion Temporal Validation (v5)
@@ -475,9 +505,11 @@ by construction (the noise estimator is trained on those same silent frames),
 reducing discriminative power. The 100-sample localized window is sensitive
 to noise or oscillations occurring immediately before the click.
 
-If `peak_idx` is small and fewer than P samples are available in the current
-frame, the previous frame is appended on the left (see `_build_pre_window`)
-to guarantee that P samples are available regardless of click position.
+If the click emerges near the start of its frame, the pre-window reaches into the
+previous frame automatically: the pre-window is sliced from the stitched context
+(§7.1), so P samples are always available regardless of click position. (The
+standalone `_build_pre_window` helper that used to do this per-frame is retained
+only for reference and is no longer on the live path.)
 
 **pre_SNR:**
 
@@ -500,7 +532,9 @@ Scan forward from `decay_end` (see §10) for a fixed number of samples:
 post_window = A[decay_end : decay_end + P]    P = 100 samples (0.5 ms)
 ```
 
-If `decay_end` is near the frame boundary, extend into the next frame.
+`decay_end` and the post-window are indices into the stitched context (§7.1), so
+a decay that ends in the next frame is measured on real samples rather than
+truncated at the 512-sample boundary.
 
 **post_SNR:**
 
@@ -657,6 +691,8 @@ centroid_shift = SC_early - SC_late    [Hz]
 
 These three features are computed directly from the normalized FFT magnitude spectrum of the candidate frame. Because they require only the frequency-domain data already available at Stage 2, they are computed there and carried forward into the SVM feature vector — but their role is classification, not gating.
 
+> **Known limitation (deferred):** SPR, R_spectral and FPE_hz are still computed from the *whole 2.56 ms frame FFT*, not from the click's onset→decay_end region. For a click occupying a small slice of its frame, they describe mostly noise, and for a borderline click the frame holds only half the click's energy. Unlike the time-domain features (§7.1), these were **not** migrated to the stitched-context region in this revision — that is a separate, deliberately deferred change, so that only one feature-distribution shift lands per SVM retrain.
+
 ---
 
 **Spectral Peak Ratio (SPR)**
@@ -706,16 +742,23 @@ The frequency bin carrying the maximum spectral power, converted to Hz. Provides
 
 ## 9. Stage 4 – Deduplication
 
-Unchanged from v4.
+Deduplication now groups by the click's **absolute peak sample** (`peak_abs`, §7.1), not by frame-index proximity. Because both Stage 1 candidates of a straddling click resolve to an integer-identical `peak_abs`, they land in the same group by construction — identity is deterministic and independent of the SVM.
 
 ```
-MAX_GAP = 3 consecutive frames (~7.7 ms)
+PEAK_MATCH_SAMPLES = 8 samples (~40 µs)   # a jitter margin, NOT a time window
 
-1. Sort Stage 3 survivors by frame_idx
-2. Group frames with gap ≤ MAX_GAP
-3. Within each group, keep frame with maximum peak_amp
-4. Assign timestamp = frame_start_time of retained frame
+1. Sort Stage 3 survivors by peak_abs
+2. Start a new group when the peak_abs gap exceeds PEAK_MATCH_SAMPLES
+3. Within each group keep the CANONICAL representative — the candidate whose
+   own frame owns the peak (frame_idx == canonical_frame_idx), so its context
+   has the peak centred and therefore the cleanest envelope. Fall back to
+   highest svm_probability, then earliest frame.
+4. Assign timestamp = frame_start_time of the retained (canonical) frame
 ```
+
+**Behaviour change vs. the old frame-gap logic.** The previous rule merged any detections within 3 frames (~7.7 ms) and broke ties by `svm_probability`. That merged two genuinely distinct clicks less than 7.7 ms apart, and let the retained frame move with every retrained model. Peak-sample grouping keeps distinct clicks separate and fixes the retained frame to the one that physically owns the peak. Expect detection counts to shift accordingly.
+
+`DEDUP_WINDOW_FRAMES` (= 3) is retained in the code only because `evaluate_candidates.py` imports it; it no longer drives Stage 4.
 
 ---
 
@@ -1077,6 +1120,7 @@ pred  = (proba >= thr).astype(int)   # 1 = click, 0 = noise
 | v3.1 | March 2026 | Added asymmetry (C4), τ range (C5); window extended to 300 samples |
 | v4.0 | March 2026 | Absolute peak_iFFT (C1=130µV); τ criterion; R² criterion; asymmetry reformulated; Gibbs suppressor v3; Stage 1 k=5 + MAX_RUN=4; Stage 2 normalized peak filter |
 | **v5.0** | **May–June 2026** | **Adaptive noise estimator; Stage 1 adaptive threshold + MAX_RUN=3; Stage 2 hard gates (R²<0.10, SPR≥100); all other thresholds replaced with SVM features; improved fit pipeline (dynamic window, Gaussian smoothing, slope-based decay_start); new features: post_SNR, ZCR×3, kurtosis, centroid_shift, rise/fall time, asymmetry_integral; E_W1/E_W4 removed; RBF-SVM trained on 285 labeled events from 38 sessions (16 features, threshold=0.220, CV recall=0.907, Set B AUC=0.925)** |
+| v5.1 | July 2026 | Frame-grid-independent features: every time-domain feature is now resolved and measured on a stitched prev\|curr\|next context (§7.1), fixing the silent truncation of `ZCR_post`/`kurtosis`/`centroid_shift_hz`/`asymmetry_integral` for boundary-straddling clicks. Stage 4 deduplicates by absolute peak sample (`peak_abs`) instead of frame-index gap (§9); one screenshot per physical click, peak-centred and frame-independent. Spectral features (SPR/R_spectral/FPE_hz) still frame-based — Region-FFT migration deferred. **Changes feature values → SVM retrain required.** |
 
 ---
 
