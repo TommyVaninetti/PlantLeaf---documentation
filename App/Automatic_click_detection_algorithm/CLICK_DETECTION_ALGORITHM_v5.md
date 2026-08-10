@@ -1,6 +1,6 @@
 # PlantLeaf – Automatic Ultrasonic Click Detection Algorithm
 
-**Version:** 5.0
+**Version:** 5.1
 **Date:** June 2026
 **Authors:** Tommaso Vaninetti
 **Repository:** [PlantLeaf-Desktop-App](https://github.com/TommyVaninetti/PlantLeaf-Desktop-App)
@@ -1139,4 +1139,4 @@ pred  = (proba >= thr).astype(int)   # 1 = click, 0 = noise
 ---
 
 *Document maintained by the PlantLeaf project contributors.*
-*Last updated: June 2026 — v5.0*
+*Last updated: June 2026 — v5.1*
