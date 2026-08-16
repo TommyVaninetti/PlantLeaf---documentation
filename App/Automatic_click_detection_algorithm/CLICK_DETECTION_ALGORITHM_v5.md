@@ -649,16 +649,32 @@ K_excess = K - 3    (excess kurtosis; Gaussian noise → 0)
 
 **Window:** from the first `A[n] ≥ noise_floor + std_noise` before the peak, to `decay_end`. Captures the full event without diluting with surrounding silence.
 
-**Typical values:**
+**Typical values** — measured on the 285 labelled events of `Dataset_20June2026.csv`:
 
-| Signal | K_excess |
-|---|---|
-| Gaussian noise | ≈ 0 |
-| Sustained vibration | 2 – 7 |
-| Genuine cavitation click | 15 – 50 |
-| EMI spike (very sharp) | > 100 |
+| Signal | K_excess p10 | median | p90 | max |
+|---|---|---|---|---|
+| Hard negative (labelled noise, n=194) | −1.10 | **−0.58** | 1.22 | 13.65 |
+| Confirmed cavitation click (n=91) | −0.60 | **0.45** | 2.98 | 14.22 |
 
-Note: both genuine clicks and EMI spikes can have high kurtosis. Kurtosis alone is not sufficient — it works in combination with rise_time (spikes have physically impossible rise times) and asymmetry_integral (spikes are symmetric).
+Clicks sit above negatives, and kurtosis is the **strongest** of the 15 non-`peak_SNR` features by
+single-feature AUC (0.764) — but both populations sit near zero, not in the tens.
+
+> **Corrected August 2026.** Earlier revisions of this table gave "Gaussian noise ≈ 0 / sustained
+> vibration 2 – 7 / genuine cavitation click 15 – 50 / EMI spike > 100". Those figures are
+> inconsistent with the window defined immediately above: **0.0 % of the 91 confirmed clicks reach
+> 15**, and the maximum observed anywhere in the labelled set is 14.2.
+>
+> The cause is the window itself. Excess kurtosis measures how much energy sits in *rare* extreme
+> samples relative to the rest of the window. A window cropped tightly to the event — which is
+> exactly what `[event_start : decay_end]` gives, and what the "without diluting with surrounding
+> silence" note above specifies — is uniformly energetic and therefore scores near zero. Values in
+> the tens require a window that is **mostly baseline** with an isolated spike, i.e. a different
+> window definition from the one used here.
+>
+> The formula and the implementation (`_feat_kurtosis`) agree with each other and are correct; only
+> the reference table was wrong. Use the measured ranges above.
+
+Note: kurtosis alone is not sufficient — it works in combination with rise_time (spikes have physically impossible rise times) and asymmetry_integral (spikes are symmetric).
 
 ---
 
@@ -1113,14 +1129,14 @@ pred  = (proba >= thr).astype(int)   # 1 = click, 0 = noise
 
 | Version | Date | Key changes |
 |---|---|---|
-| v1.0 | August 2025 | Basic energy threshold + single R² criterion |
-| v2.0 | November 2025 | Added R, iFFT reconstruction, Hilbert envelope |
+| v1.0 | August 2025 | Basic energy threshold |
+| v2.0 | November 2025 | Added R_spectral, iFFT reconstruction, Hilbert envelope |
 | v2.1 | December 2026 | R²_log ≥ 0.60–0.80 as primary gate; 22% FNR discovered |
 | v3.0 | Februery 2026 | R² removed as gate; 3-criteria (SNR, pre_snr, E_W1>E_W4) |
 | v3.1 | March 2026 | Added asymmetry (C4), τ range (C5); window extended to 300 samples |
 | v4.0 | March 2026 | Absolute peak_iFFT (C1=130µV); τ criterion; R² criterion; asymmetry reformulated; Gibbs suppressor v3; Stage 1 k=5 + MAX_RUN=4; Stage 2 normalized peak filter |
 | **v5.0** | **May–June 2026** | **Adaptive noise estimator; Stage 1 adaptive threshold + MAX_RUN=3; Stage 2 hard gates (R²<0.10, SPR≥100); all other thresholds replaced with SVM features; improved fit pipeline (dynamic window, Gaussian smoothing, slope-based decay_start); new features: post_SNR, ZCR×3, kurtosis, centroid_shift, rise/fall time, asymmetry_integral; E_W1/E_W4 removed; RBF-SVM trained on 285 labeled events from 38 sessions (16 features, threshold=0.220, CV recall=0.907, Set B AUC=0.925)** |
-| v5.1 | July 2026 | Frame-grid-independent features: every time-domain feature is now resolved and measured on a stitched prev\|curr\|next context (§7.1), fixing the silent truncation of `ZCR_post`/`kurtosis`/`centroid_shift_hz`/`asymmetry_integral` for boundary-straddling clicks. Stage 4 deduplicates by absolute peak sample (`peak_abs`) instead of frame-index gap (§9); one screenshot per physical click, peak-centred and frame-independent. Spectral features (SPR/R_spectral/FPE_hz) still frame-based — Region-FFT migration deferred. **Changes feature values → SVM retrain required.** |
+| v5.1 | July 2026 | Frame-grid-independent features: every time-domain feature is now resolved and measured on a stitched prev\|curr\|next context (§7.1), fixing possible silent truncation of `ZCR_post`/`kurtosis`/`centroid_shift_hz`/`asymmetry_integral` for boundary-straddling clicks. Stage 4 deduplicates by absolute peak sample (`peak_abs`) instead of frame-index gap (§9); one screenshot per physical click, peak-centred and frame-independent. Spectral features (SPR/R_spectral/FPE_hz) still frame-based — Region-FFT migration deferred. **Changes feature values → SVM retrain required and will be executed after spectral features introduction briefly.** |
 
 ---
 
@@ -1128,13 +1144,9 @@ pred  = (proba >= thr).astype(int)   # 1 = click, 0 = noise
 
 1. **Khait I., et al.** "Sounds emitted by plants under stress are airborne and informative." *Cell*, 186(7):1328–1336, 2023.
 2. **Martin R.** "Noise power spectral density estimation based on optimal smoothing and minimum statistics." *IEEE Trans. Speech Audio Process.*, 9(5):504–512, 2001. *(Minimum-statistics noise floor estimator)*
-3. **Cohen I., Berdugo B.** "Noise estimation by minima controlled recursive averaging." *IEEE Signal Process. Lett.*, 9(1):12–15, 2002. *(Adaptive noise tracking)*
-4. **Vaseghi S.V.** *Advanced Digital Signal Processing and Noise Reduction*, 4th ed. Wiley, 2008.
-5. **Tyree M.T., Sperry J.S.** "Do woody plants operate near the point of catastrophic xylem dysfunction?" *Plant Physiology*, 88(3):574–580, 1988.
-6. **Boashash B.** *Time-Frequency Signal Analysis and Processing*, 2nd ed. Academic Press, 2015.
-7. **Harris F.J.** "On the use of windows for harmonic analysis with the DFT." *Proceedings of the IEEE*, 66(1):51–83, 1978.
-8. **Knowles Electronics.** *SPU0410LR5H-QB Datasheet*, Rev. H, 2020.
-9. **STMicroelectronics.** *STM32F411CEU6 Datasheet*, 2023.
+3. **Tyree M.T., Sperry J.S.** "Do woody plants operate near the point of catastrophic xylem dysfunction?" *Plant Physiology*, 88(3):574–580, 1988.
+4. **Knowles Electronics.** *SPU0410LR5H-QB Datasheet*, Rev. H, 2020.
+5. **STMicroelectronics.** *STM32F411CEU6 Datasheet*, 2023.
 
 ---
 

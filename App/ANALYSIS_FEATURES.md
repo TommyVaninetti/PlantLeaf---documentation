@@ -146,7 +146,7 @@ Runs `compute_features_v5()` for this frame, fetching per-frame noise estimates 
 | 7 | ZCR_pre | low (silence before) |
 | 8 | ZCR_click | oscillation rate during click |
 | 9 | ZCR_post | decreasing during decay |
-| 10 | kurtosis | 15–50 (impulsive event) |
+| 10 | kurtosis | > 0, typically 0.4–3 (noise ≈ −0.6) |
 | 11 | centroid_shift_hz | > 2–5 kHz (high frequencies decay first) |
 | 12 | tau_ms | 0.05–1.3 ms (cavitation) |
 | 13 | R² | ≥ 0.45 (exponential fit quality) |
