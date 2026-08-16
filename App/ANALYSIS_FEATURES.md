@@ -135,25 +135,55 @@ The peak is located on the envelope rather than on the oscillating signal, which
 
 Runs `compute_features_v5()` for this frame, fetching per-frame noise estimates from `AudioDataManager` and the adjacent frame envelopes for `pre_SNR` and `post_SNR`. A scrollable dialog shows all 17 v5 features alongside physically motivated expected ranges:
 
-| # | Feature | Expected range (genuine click) |
-|---|---------|-------------------------------|
-| 1 | peak_SNR | >> 1 (typically 10–1000+) |
-| 2 | pre_SNR | ≈ 1.0 (silence before click) |
-| 3 | post_SNR | ≈ 1.0 (return to silence) |
-| 4 | rise_time_ms | 0.025–0.3 ms |
-| 5 | fall_time_ms | > rise_time |
-| 6 | asymmetry_integral | positive (decay > rise) |
-| 7 | ZCR_pre | low (silence before) |
-| 8 | ZCR_click | oscillation rate during click |
-| 9 | ZCR_post | decreasing during decay |
-| 10 | kurtosis | > 0, typically 0.4–3 (noise ≈ −0.6) |
-| 11 | centroid_shift_hz | > 2–5 kHz (high frequencies decay first) |
-| 12 | tau_ms | 0.05–1.3 ms (cavitation) |
-| 13 | R² | ≥ 0.45 (exponential fit quality) |
-| 14 | fit_coverage | 0.7–1.0 (fraction of decay window used) |
-| 15 | SPR | ≤ 20 (broadband, not tonal) |
-| 16 | R_spectral | descriptive — E[20–40 kHz] / E[40–80 kHz] |
-| 17 | FPE_hz | dominant frequency in the analysis band |
+Ranges below are **measured** on the 91 confirmed clicks of `Dataset_20June2026.csv`, quoted as
+p10–p90 unless stated. The "negatives" column is the median over the 194 hard negatives, which is
+what makes each range discriminative or not.
+
+| # | Feature | Expected range (genuine click) | click median | neg. median |
+|---|---------|-------------------------------|---|---|
+| 1 | peak_SNR | ≫ 1; typically 7.2–39 (max ~150) | 12.79 | 5.44 |
+| 2 | pre_SNR | ≈ 1.0 (0.84–1.39) | 1.04 | 1.19 |
+| 3 | post_SNR | 1.0–2.1 | 1.33 | 1.32 |
+| 4 | rise_time_ms | 0.025–0.13 ms (up to 0.3) | 0.045 | 0.035 |
+| 5 | fall_time_ms | > rise_time; 0.055–0.30 ms | 0.130 | 0.060 |
+| 6 | asymmetry_integral | positive; 0.07–0.31 | 0.185 | 0.179 |
+| 7 | ZCR_pre | low; 12–36 crossings/ms | 22.0 | 26.0 |
+| 8 | ZCR_click | 28–72 crossings/ms | 48.5 | 42.7 |
+| 9 | ZCR_post | 34–84 crossings/ms ⚠️ | 58.1 | 51.2 |
+| 10 | kurtosis | > 0, typically 0.4–3 (noise ≈ −0.6) | 0.445 | −0.578 |
+| 11 | centroid_shift_hz | median ≈ +0.4 kHz; wide, often negative ⚠️ | 358 Hz | 0 Hz |
+| 12 | tau_ms | 0.075–0.47 ms (cavitation) | 0.188 | 0.138 |
+| 13 | R² | 0.27–0.91; Stage 2 gates at ≥ 0.10 | 0.602 | 0.428 |
+| 14 | fit_coverage | 0.52–0.90 | 0.692 | 0.853 |
+| 15 | SPR | ≤ 20 (typically 5.8–16.4) | 9.02 | 9.22 |
+| 16 | R_spectral | descriptive — E[20–40 kHz] / E[40–80 kHz] | 1.42 | 1.00 |
+| 17 | FPE_hz | 23–46 kHz | 41.8 kHz | 43.0 kHz |
+
+> ⚠️ **Corrected August 2026 — the previous ranges were design expectations, not measurements, and
+> six of them did not match the labelled data.** Fraction of the 91 confirmed clicks that satisfied
+> the old stated range:
+>
+> | feature | old range | clicks satisfying it |
+> |---|---|---|
+> | centroid_shift_hz | > 2–5 kHz | **36.3 %** |
+> | fit_coverage | 0.7–1.0 | **49.5 %** |
+> | R² | ≥ 0.45 | **69.2 %** |
+> | kurtosis | 15–50 | **0.0 %** |
+> | peak_SNR | 10–1000+ | max observed is 147, and p10 is 7.2 |
+> | ZCR_post | "decreasing during decay" | ZCR_post (58.1) is **higher** than ZCR_click (48.5) |
+>
+> Two of these are more than stale numbers — **the physical expectation itself is not observed**:
+>
+> - **centroid_shift_hz.** §8.8's rationale is that high frequencies attenuate faster, so the
+>   spectral centroid should fall during decay. Measured, the median shift is only +358 Hz and the
+>   p10 is −7.9 kHz, i.e. it frequently moves the *other* way. Consistent with it being the weakest
+>   feature in the model (permutation importance −0.002, the only negative one).
+> - **ZCR_post.** Expected to decrease during decay; measured it is consistently *higher* than
+>   ZCR_click. Plausibly because the post-window sits closer to the noise floor, where
+>   zero-crossings are noise-driven rather than signal-driven.
+>
+> Neither invalidates the SVM — both are inputs it weighs, not gates it enforces — but the stated
+> rationale should not be quoted as if the data supported it.
 
 These ranges are guidance only. No hard thresholds are applied in the iFFT window — all 17 features are passed to the SVM for the final decision. `fit_coverage` is excluded from the SVM input and shown for diagnostic purposes only.
 
