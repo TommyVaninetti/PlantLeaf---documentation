@@ -178,11 +178,12 @@ pip install scipy
 **Official Site**: [https://scikit-learn.org/](https://scikit-learn.org/)
 
 **Why scikit-learn?**
-- **SVM with probability output**: `SVC(probability=True)` enables Platt scaling — calibrated probabilities that can be thresholded independently of the training decision boundary, which is essential for the recall-optimised threshold used in v5
-- **Pipeline API**: chains `SimpleImputer → StandardScaler → SVC` into a single serialisable object; the entire preprocessing + model is loaded and applied in one call at inference time with no risk of mismatched transforms
+- **SVM with probability output**: `SVC(probability=True)` enables Platt scaling — calibrated probabilities that can be thresholded independently of the training decision boundary, which is essential for the recall-optimised threshold used in v6 (0.121, tuned from the out-of-fold ROC curve)
+- **Pipeline API**: chains `SimpleImputer → scaler → SVC` into a single serialisable object; the entire preprocessing + model is loaded and applied in one call at inference time with no risk of mismatched transforms
+- **`PowerTransformer` (Yeo–Johnson)**: the v6 scaler. These features are ratios with long tails, and Yeo–Johnson was selected on measurement — it beat `StandardScaler`, `RobustScaler`, `QuantileTransformer` and a log10 transform on cross-validated AUC, handles zero and negative values without column subsetting, and pickles with no import coupling
 - **Session-level cross-validation**: `StratifiedGroupKFold` prevents recording-level data leakage by keeping all candidates from the same `.paudio` file in the same fold
-- **Recall-optimised hyperparameter search**: `GridSearchCV` with a custom recall scorer selects hyperparameters that maximise click detection, not accuracy
-- **Model-agnostic feature importance**: `permutation_importance` measures the recall drop when each feature is shuffled — directly reflects the metric that matters
+- **Hyperparameter search on ranking quality**: `GridSearchCV` scores on `roc_auc`, because the grid selects hyperparameters while the decision threshold is tuned separately afterwards from the out-of-fold ROC curve — AUC measures ranking quality, which is exactly what that tuning consumes
+- **Model-agnostic feature importance**: `permutation_importance` is run on both the training set and the held-out sessions. The first says what the fitted model leans on, the second what still carries signal where it has never looked — a feature ranking high in one and near zero in the other is a property of the training sessions, not of clicks
 - **BSD License**: Permissive
 
 **Installation**:
@@ -191,11 +192,11 @@ pip install scikit-learn
 ```
 
 **Key components used**:
-- `SVC(probability=True, kernel='rbf', C=50, gamma=0.01)` — RBF-kernel classifier with Platt-calibrated probabilities
-- `Pipeline([('imputer', SimpleImputer()), ('scaler', StandardScaler()), ('svm', SVC(...))])` — end-to-end preprocessing + inference object
+- `SVC(probability=True, kernel='rbf', C=50, gamma=0.01, class_weight='balanced')` — RBF-kernel classifier with Platt-calibrated probabilities
+- `Pipeline([('imputer', SimpleImputer(strategy='median')), ('scaler', PowerTransformer()), ('svm', SVC(...))])` — end-to-end preprocessing + inference object
 - `StratifiedGroupKFold(n_splits=5)` — session-aware cross-validation
-- `GridSearchCV(scoring='recall')` — hyperparameter search on 20 combinations × 5 folds
-- `permutation_importance(n_repeats=15)` — feature ranking by recall drop
+- `GridSearchCV(scoring='roc_auc')` — hyperparameter search over C, gamma and class_weight
+- `permutation_importance` — feature ranking by AUC drop, on both Set A and the held-out Set B
 
 **Use in PlantLeaf**:
 - **Training** (`src/ml/train_svm.py`): full cross-validated training pipeline; model saved as `.pkl` via joblib

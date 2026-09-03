@@ -4,7 +4,7 @@
 
 PlantLeaf provides two offline analysis modes for reviewing saved recordings:
 
-- **Audio Replay** (`ReplayWindowAudio`): frame-by-frame FFT inspection, adaptive energy filtering, inverse FFT reconstruction, v5 feature computation, and data collection export for the click detection pipeline.
+- **Audio Replay** (`ReplayWindowAudio`): frame-by-frame FFT inspection, adaptive energy filtering, inverse FFT reconstruction, feature computation, and data collection export for the click detection pipeline.
 - **Voltage Replay** (`ReplayVoltageWindow`): time-domain voltage signal review, region selection, and mathematical curve fitting for plant electrical events.
 
 ---
@@ -76,7 +76,7 @@ The right panel contains two tabs:
 
 **k spinbox** ("Stage 1 threshold multiplier k"): range 0.5–20.0, step 0.5, default 1.5. Lower k casts a wider net; higher k reduces false positives. Press "Apply" or change the spinbox value to rebuild the table. The threshold curve on the time-domain plot updates automatically when k changes.
 
-This filter exposes Stage 1 of the v5 click detection pipeline interactively. See [CLICK_DETECTION_ALGORITHM_v5.md](Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v5.md) for the full pipeline (Stages 1–4) and the offline SVM classifier.
+This filter exposes the Stage 1 *threshold* interactively. Note that it lists grouped above-threshold frames, which is not the same as the Stage 1 candidate set: since v6, Stage 1 selects local energy maxima rather than grouping runs. See [CLICK_DETECTION_ALGORITHM_v6.md](Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v6.md) for the full pipeline (Stages 1–4) and the SVM classifier.
 
 ---
 
@@ -129,11 +129,13 @@ The peak is located on the envelope rather than on the oscillating signal, which
 
 ---
 
-### Decay Analysis (v5 Features)
+### Decay Analysis (Feature Inspection)
 
 **Button**: "Analyze Decay"
 
-Runs `compute_features_v5()` for this frame, fetching per-frame noise estimates from `AudioDataManager` and the adjacent frame envelopes for `pre_SNR` and `post_SNR`. A scrollable dialog shows all 17 v5 features alongside physically motivated expected ranges:
+Runs the feature computation for this frame, fetching per-frame noise estimates from `AudioDataManager` and the adjacent frame signals for the stitched context. A scrollable dialog shows the v5 feature set alongside physically motivated expected ranges:
+
+> **These ranges are from the v5-era labelled set** (91 confirmed clicks, 194 hard negatives, `Dataset_20June2026.csv`). They have not been recomputed on the v6 corpus, and only seven of the features listed below are read by the deployed v6 model — see [CLICK_DETECTION_ALGORITHM_v6.md](Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v6.md) §11. The dialog is a diagnostic display, not the classifier's input.
 
 Ranges below are **measured** on the 91 confirmed clicks of `Dataset_20June2026.csv`, quoted as
 p10–p90 unless stated. The "negatives" column is the median over the 194 hard negatives, which is
@@ -153,7 +155,7 @@ what makes each range discriminative or not.
 | 10 | kurtosis | > 0, typically 0.4–3 (noise ≈ −0.6) | 0.445 | −0.578 |
 | 11 | centroid_shift_hz | median ≈ +0.4 kHz; wide, often negative ⚠️ | 358 Hz | 0 Hz |
 | 12 | tau_ms | 0.075–0.47 ms (cavitation) | 0.188 | 0.138 |
-| 13 | R² | 0.27–0.91; Stage 2 gates at ≥ 0.10 | 0.602 | 0.428 |
+| 13 | R² | 0.27–0.91 (v5 gated at ≥ 0.10; **v6 does not gate on R²**) | 0.602 | 0.428 |
 | 14 | fit_coverage | 0.52–0.90 | 0.692 | 0.853 |
 | 15 | SPR | ≤ 20 (typically 5.8–16.4) | 9.02 | 9.22 |
 | 16 | R_spectral | descriptive — E[20–40 kHz] / E[40–80 kHz] | 1.42 | 1.00 |
@@ -185,7 +187,7 @@ what makes each range discriminative or not.
 > Neither invalidates the SVM — both are inputs it weighs, not gates it enforces — but the stated
 > rationale should not be quoted as if the data supported it.
 
-These ranges are guidance only. No hard thresholds are applied in the iFFT window — all 17 features are passed to the SVM for the final decision. `fit_coverage` is excluded from the SVM input and shown for diagnostic purposes only.
+These ranges are guidance only. No hard thresholds are applied in the iFFT window. In v6 the SVM reads **7** of these features — `peak_SNR`, `pre_SNR`, `post_SNR`, `rise_time_ms`, `fall_time_ms`, `fit_valid`, `R2` — and the rest are computed and exported for analysis and future retrains. `model['features']` is authoritative at inference; schema membership is not model membership.
 
 ---
 
@@ -215,11 +217,11 @@ Hides or restores the raw iFFT trace to let the Hilbert envelope be inspected wi
 
 ## Click Detection Algorithm
 
-The v5 pipeline (Stages 1–4) runs in real-time during acquisition and can be re-applied offline via the data collection export. The threshold filter in the replay window exposes Stage 1 interactively.
+The v6 pipeline (Stages 1–4) runs in real-time during acquisition and can be re-applied offline via the data collection export. The threshold filter in the replay window exposes the Stage 1 threshold interactively.
 
-For the complete algorithm specification — including Stage 2 hard gates (R² ≥ 0.10, SPR < 100), Stage 3 SVM classifier, Stage 4 deduplication, all 17 feature definitions, training protocol, and evaluation results — see:
+For the complete algorithm specification — including Stage 1 local peak picking, the Stage 2 gates and their measured click cost, the Stage 3 SVM classifier, Stage 4 deduplication, all feature definitions, the training protocol and evaluation results — see:
 
-**[CLICK_DETECTION_ALGORITHM_v5.md](Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v5.md)**
+**[CLICK_DETECTION_ALGORITHM_v6.md](Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v6.md)**
 
 ---
 
@@ -232,20 +234,26 @@ For the complete algorithm specification — including Stage 2 hard gates (R² �
 **Dialog** (`DataCollectionDialogV5`):
 - Select `.paudio` files from a folder
 - Set the Stage 1 multiplier k (default 1.5 — intentionally wide to avoid missing any click)
-- Run export: for each candidate, all 17 v5 features and noise estimates are computed and written
+- Choose the Stage 2 mode (`v6_conservative` by default) and the export mode
+- Run export: for each candidate, every feature and noise estimate is computed and written
 
-**CSV schema** (one row per Stage 1 candidate):
+**CSV schema** (`SCHEMA_VERSION = 'v6'`, 57 columns, one row per Stage 1 candidate):
 
-| Column | Description |
+| Column group | Description |
 |--------|-------------|
-| file | `.paudio` filename |
-| frame_idx | Frame index (0-based) |
-| timestamp_s | Absolute time (s) |
-| noise_floor_uV | Adaptive noise floor at this frame (µV) |
-| std_noise_uV | Noise standard deviation (µV) |
-| E_hat_floor | Ê_floor energy threshold (V²) |
-| peak_SNR … FPE_hz | 17 v5 features |
-| label | Fill manually: 1 = click, 0 = noise, empty = unknown |
+| identity & provenance | `schema_version`, `session_id`, `file`, `frame_idx`, `peak_abs`, `timestamp_s`, `stage2_mode`, `stage1_params` |
+| noise state | `noise_floor_mV`, `std_noise_mV`, `E_hat_floor`, `k_ratio` |
+| v5 features (17) | `peak_SNR` … `FPE_hz` |
+| v6 features (9) | `spectral_entropy`, `shape_novelty`, `spectral_tilt`, `temporal_concentration`, `FPE_hz_region`, `SPR_region`, `f_50_hz`, `IQR_f`, `local_crest` |
+| harmonic confinement | `harmonic_confinement`, `hc_f1_hz`, `hc_r_A`, `hc_r_B` |
+| validity & quality | `fit_valid`, `decay_len`, `n_seg`, `b3_frames`, `gibbs_fired` |
+| Stage 1 diagnostics | `run_id`, `run_length`, `run_crest`, `pos_in_run`, `would_pass_v5` |
+| labels & verdicts | `label`, `note`, `svm_probability`, `svm_prediction`, `stage_blocked` |
+
+`peak_abs` is the absolute sample index of the peak and is the key label migration is
+performed on — `(file, frame_idx)` is not unique. `label` is `1` = click, `0` = noise,
+`2` = **ambiguous** (judged, but genuinely uncertain — a decision, never a class), empty =
+not yet judged.
 
 **Screenshots**: two-panel PNG per candidate (FFT spectrum + iFFT waveform with feature table), rendered with QPainter without opening display windows.
 
@@ -404,12 +412,12 @@ All fitted parameters can be adjusted via spinboxes after auto-fitting. The curv
 
 ## References
 
-1. **Click Detection Algorithm v5**: [CLICK_DETECTION_ALGORITHM_v5.md](../autoclick/v5/CLICK_DETECTION_ALGORITHM_v5.md)
+1. **Click Detection Algorithm v6**: [CLICK_DETECTION_ALGORITHM_v6.md](Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v6.md)
 2. **FFT Phase Technical Specification**: [FFT_PHASE_TECHNICAL_SPECIFICATION.md](FFT_PHASE_TECHNICAL_SPECIFICATION.md)
 3. **Microphone Normalization Report**: [MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md](MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md)
 
 ---
 
-**Last Updated**: June 2026  
+**Last Updated**: September 2026  
 **Author**: Tommaso Vaninetti  
 **Version**: 2.0

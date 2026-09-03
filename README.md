@@ -16,7 +16,7 @@ PlantLeaf bridges the gap between rigorous scientific analysis and accessible to
 - **Ultrasonic Click Detection**: capture and analyze plant-emitted ultrasonic clicks (20–80 kHz) with sub-millisecond temporal resolution
 - **Action Potential Monitoring**: high-precision voltage acquisition for plant electrical signals
 - **Real-Time Acquisition**: live FFT spectrum visualization at 390.625 FPS for audio and up to 1 kHz sampling for bioelectric signals
-- **Machine Learning Pipeline**: SVM classifier (v5) trained on 17 hand-crafted acoustic features for high-recall click detection
+- **Machine Learning Pipeline**: SVM classifier (v6) trained on hand-crafted acoustic features for high-recall click detection, with every gate threshold quoted against its measured cost in confirmed clicks
 - **Advanced Analysis Tools**: phase-preserving FFT, inverse FFT reconstruction, microphone normalization, automatic curve fitting for voltage signals
 
 ### Scientific Capabilities
@@ -58,20 +58,22 @@ This repository focuses on:
 
 ---
 
-### Ultrasonic Click Detection Algorithm — v5
+### Ultrasonic Click Detection Algorithm — v6
 
 The current version uses a 4-stage pipeline:
 
 | Stage | Description |
 |-------|-------------|
-| Stage 1 | Adaptive energy threshold: frame energy > k × Ê_floor (AdaptiveNoiseEstimatorV5) |
-| Stage 2 | Hard gates: R² ≥ 0.10 (exponential decay quality) and SPR < 100 (broadband shape) |
-| Stage 3 | SVM classifier on 16 acoustic features (RBF kernel, threshold = 0.220 for recall ≥ 0.90) |
-| Stage 4 | Deduplication: merge consecutive detections, keep strongest |
+| Stage 1 | Adaptive energy threshold (frame energy > k × Ê_floor, k = 1.5), then **local peak picking** over ±1 frame. Nothing is rejected for run length |
+| Stage 2 | Gates on measurable features: `peak_SNR ≥ 4.5`, `n_seg ≥ 10`, `local_crest ≥ 1.2`, `harmonic_confinement ≤ 1.6`, plus two out-of-distribution bounds |
+| Stage 3 | SVM classifier on 7 acoustic features (RBF kernel, threshold = 0.121 for recall ≥ 0.90) |
+| Stage 4 | Deduplication on the absolute peak sample (`peak_abs`) |
 
-The SVM (scikit-learn `Pipeline`: `SimpleImputer → StandardScaler → SVC`) was trained with session-level cross-validation (`StratifiedGroupKFold`) on 285 labeled candidates (91 clicks, 38 sessions, 4 plant species). AUC-ROC = 0.835; Set B recall = 0.962.
+The SVM (scikit-learn `Pipeline`: `SimpleImputer(median) → PowerTransformer(yeo-johnson) → SVC`, `class_weight='balanced'`) was trained with session-level cross-validation (`StratifiedGroupKFold`) on 1,136 Stage-2 survivors (189 confirmed clicks, 30 sessions, 4 plant species). Cross-validated AUC-ROC = 0.929 at recall 0.905; held-out AUC-ROC = 0.958 at recall 0.968.
 
-For the full algorithm specification, feature definitions, training protocol, and evaluation results, see [CLICK_DETECTION_ALGORITHM_v5.md](App/Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v5.md).
+Every Stage 2 threshold is quoted in the specification with the measured percentage of confirmed clicks it costs — the v6 rule removes 83.6 % of noise for a measured 0.0 % of clicks, where the v5 rule it replaced cost 12.2 %.
+
+For the full algorithm specification, feature definitions, training protocol, and evaluation results, see [CLICK_DETECTION_ALGORITHM_v6.md](App/Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v6.md).
 
 ---
 
@@ -165,8 +167,9 @@ Extracts 7 parameters across the depolarization and repolarization phases.
 ### Technical Specifications
 - **[FFT_PHASE_TECHNICAL_SPECIFICATION.md](App/FFT_PHASE_TECHNICAL_SPECIFICATION.md)**: mathematical foundation of FFT/iFFT processing
 - **[MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md](App/MICROPHONE_NORMALIZATION_TECHNICAL_REPORT.md)**: error analysis and validation (±2.9 dB)
+- **[CLICK_DETECTION_ALGORITHM_v6.md](App/Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v6.md)**: click detection algorithm v6 (current)
+- **[CLICK_DETECTION_ALGORITHM_v5.md](App/Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v5.md)**: click detection algorithm v5 (historical)
 - **[CLICK_DETECTION_ALGORITHM_v4.md](App/Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v4.md)**: click detection algorithm v4 (historical)
-- **[CLICK_DETECTION_ALGORITHM_v5.md](App/Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v5.md)**: click detection algorithm v5 (current)
 - **[AUDIO_HARDWARE.md](Hardware/AUDIO_HARDWARE.md)**: ASEB board design and specifications
 - **[VOLTAGE_HARDWARE.md](Hardware/VOLTAGE_HARDWARE.md)**: ESEB board design and specifications
 
@@ -185,8 +188,8 @@ Extracts 7 parameters across the depolarization and repolarization phases.
 | Phase Quantization | 8-bit signed (−127 to +127) |
 | Data Throughput | 2.4 Mbps (USB CDC) |
 | File Format | Custom binary (`.paudio` / `.pvoltage`) |
-| SVM Features | 16 (17 computed, fit_coverage excluded from model) |
-| SVM AUC-ROC | 0.835 |
+| SVM Features | 7 (~26 computed, 57 exported per candidate) |
+| SVM AUC-ROC | 0.929 cross-validated / 0.958 held out |
 | Platform Support | Windows, macOS, Linux |
 
 ---
@@ -262,5 +265,5 @@ Our mission is to make plant bioacoustics accessible to everyone. We welcome col
 
 ---
 
-**Last Updated**: June 2026  
+**Last Updated**: September 2026  
 **Project Status**: Active Development
