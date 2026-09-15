@@ -252,17 +252,13 @@ The principal components are:
 
 At ultrasonic frequencies, the closed-loop gain is approximately:
 
-\[
-A_v = 1+\frac{R_{12}}{R_{11}}
-\]
+`Av = 1 + (R12 / R11)`
 
-\[
-A_v = 1+\frac{75\,000}{499}
-\]
+Using the current resistor values:
 
-\[
-A_v \approx 151.3
-\]
+`Av = 1 + (75,000 / 499)`
+
+`Av ≈ 151.3`
 
 Therefore, the final amplifier provides approximately:
 
@@ -280,17 +276,21 @@ The OPA365 input is AC coupled through:
 - **C11 = 1 µF**
 - **R10 = 10 kΩ to VREF**
 
-The approximate high-pass corner is:
+The approximate high-pass corner is calculated using:
 
-\[
-f_c=\frac{1}{2\pi RC}
-\]
+`fc = 1 / (2πRC)`
 
-\[
-f_c\approx15.9\,Hz
-\]
+Using:
 
-This is far below the 20–80 kHz acquisition band and therefore has negligible influence on the ultrasonic response.
+`R = 10 kΩ`
+
+`C = 1 µF`
+
+gives:
+
+`fc ≈ 15.9 Hz`
+
+This is far below the **20–80 kHz acquisition band** and therefore has negligible influence on the ultrasonic response.
 
 ---
 
@@ -303,17 +303,27 @@ The lower feedback path contains:
 
 Its approximate transition frequency is:
 
-\[
-f_c=\frac{1}{2\pi(499)(22\,\mu F)}
-\]
+`fc = 1 / (2πRC)`
 
-\[
-f_c\approx14.5\,Hz
-\]
+Using:
+
+`R = 499 Ω`
+
+`C = 22 µF`
+
+gives:
+
+`fc ≈ 14.5 Hz`
 
 This is also negligible relative to the ultrasonic acquisition band.
 
 The feedback arrangement maintains the required **1.65 V DC operating point** while providing approximately **151× AC gain**.
+
+Because the two preceding OPA2365 filter stages operate at approximately unity gain, the nominal maximum analog-chain gain is approximately:
+
+`Atotal ≈ 151×`
+
+The effective gain inside the useful band is slightly lower because of the frequency-dependent attenuation introduced by the filter stages.
 
 ---
 
@@ -348,29 +358,21 @@ Current component values:
 | C1 | **220 pF** |
 | C2 | **220 pF** |
 
-For equal resistor and capacitor values:
+For equal resistor and capacitor values, the characteristic frequency is approximately:
 
-\[
-f_0=\frac{1}{2\pi RC}
-\]
+`f0 = 1 / (2πRC)`
 
 Using:
 
-\[
-R=5.76\,k\Omega
-\]
+`R = 5.76 kΩ`
 
 and:
 
-\[
-C=220\,pF
-\]
+`C = 220 pF`
 
-gives approximately:
+gives:
 
-\[
-f_{0,LP}\approx125.6\,kHz
-\]
+`f0,LP ≈ 125.6 kHz`
 
 The low-pass characteristic frequency is deliberately placed **above 80 kHz**.
 
@@ -393,23 +395,21 @@ Current component values:
 | C3 | **1.5 nF** |
 | C4 | **1.5 nF** |
 
+For equal resistor and capacitor values:
+
+`f0 = 1 / (2πRC)`
+
 Using:
 
-\[
-R=8.2\,k\Omega
-\]
+`R = 8.2 kΩ`
 
 and:
 
-\[
-C=1.5\,nF
-\]
+`C = 1.5 nF`
 
-gives approximately:
+gives:
 
-\[
-f_{0,HP}\approx12.9\,kHz
-\]
+`f0,HP ≈ 12.9 kHz`
 
 The high-pass characteristic frequency is deliberately placed **below 20 kHz**.
 
@@ -428,15 +428,15 @@ Microphone
     │
     ▼
 Low-Pass Filter
-~125.6 kHz characteristic frequency
+f0 ≈ 125.6 kHz
     │
     ▼
 High-Pass Filter
-~12.9 kHz characteristic frequency
+f0 ≈ 12.9 kHz
     │
     ▼
 OPA365 Fixed-Gain Amplifier
-~151×
+Gain ≈ 151×
 ```
 
 The filter suppresses unwanted signals outside the useful measurement band.
@@ -494,11 +494,9 @@ The **1.65 V mid-supply reference** allows the ultrasonic AC waveform to swing a
 
 The output can therefore be represented as:
 
-\[
-V_{OUT}(t)=1.65\,V+v_{AC}(t)
-\]
+`VOUT(t) = 1.65 V + vAC(t)`
 
-where \(v_{AC}(t)\) is the amplified ultrasonic waveform.
+where `vAC(t)` is the amplified ultrasonic waveform.
 
 ---
 
@@ -532,23 +530,19 @@ The microcontroller provides:
 
 The ADC receives an analog waveform centered around:
 
-\[
-V_{REF}=1.65\,V
-\]
+`VREF = 1.65 V`
 
-For a maximum useful frequency of approximately **80 kHz**, the Nyquist minimum is:
+For a maximum useful frequency of approximately **80 kHz**, the Nyquist criterion requires:
 
-\[
-f_s>160\,kS/s
-\]
+`fs > 2 × 80 kHz`
 
-A practical design target of at least:
+therefore:
 
-\[
-f_s\ge200\,kS/s
-\]
+`fs > 160 kS/s`
 
-is therefore recommended.
+A practical minimum design target is:
+
+`fs ≥ 200 kS/s`
 
 Higher sampling rates improve:
 
@@ -574,9 +568,7 @@ The ASEB enables the detection and characterization of ultrasonic acoustic event
 
 The current hardware revision is optimized for signals whose relevant spectral content lies approximately within:
 
-\[
-20–80\,kHz
-\]
+`20 kHz – 80 kHz`
 
 The PlantLeaf analysis software can then perform:
 
@@ -695,9 +687,7 @@ Because the operational amplifiers operate from a single positive supply, VREF a
 
 Filter nodes that would conventionally reference ground in a dual-supply circuit are instead referenced to:
 
-\[
-VREF=1.65\,V
-\]
+`VREF = 1.65 V`
 
 The actual **0 V GND remains the power-supply ground**.
 
@@ -749,7 +739,7 @@ For the small frequency-setting capacitors, **C0G/NP0 ceramic dielectric** is pr
 **Hardware Design**  
 Abdoellah El Makkaoui
 
-**Software & Firmware Integration**  
+**Software Integration**  
 Tommaso Vaninetti
 
 Developed as part of the **PlantLeaf research project**.
@@ -758,6 +748,6 @@ The design of this board is still **WIP** and may continue to evolve following p
 
 ---
 
-**Last Updated:** September 15, 2026  
+**Last Updated:** September 15th, 2026  
 **ASEB Version:** 1.0
 ![Status](https://img.shields.io/badge/status-Active-green.svg)
