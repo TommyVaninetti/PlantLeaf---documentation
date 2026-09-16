@@ -1026,4 +1026,13 @@ report_acoustic.py
     — xylem vessel resonator model.
 10. **Knowles SPU0410LR5H.** Datasheet for the MEMS microphone used by the PlantLeaf acquisition system.
 
+## Development
+
+**Chemical Simulator**
+Frida Tirari
+
+Developed as part of the PlantLeaf research project.
+
+**Last Updated:** September, 2026
+**Version:** 1.0
 
