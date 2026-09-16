@@ -188,7 +188,7 @@ Extracts 7 parameters across the depolarization and repolarization phases.
 ### User Guides
 - **[ACQUISITION_FEATURES.md](App/ACQUISITION_FEATURES.md)**: complete guide to real-time acquisition modes
 - **[ANALYSIS_FEATURES.md](App/ANALYSIS_FEATURES.md)**: advanced analysis tools and workflows
-- **[ACOUSTIC_SIMULATOR.md]**: physical modeling and comparison of the two cavitation click models
+- **[ACOUSTIC_SIMULATOR.md](App/ACOUSTIC_SIMULATOR.md)**: physical modeling and comparison of the two cavitation click models
 
 ### Technical Specifications
 - **[FFT_PHASE_TECHNICAL_SPECIFICATION.md](App/FFT_PHASE_TECHNICAL_SPECIFICATION.md)**: mathematical foundation of FFT/iFFT processing
