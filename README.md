@@ -265,7 +265,7 @@ Icons: **Uicons** by [Flaticon](https://www.flaticon.com/uicons) — open-source
 
 **Software & Firmware**: Tommaso Vaninetti  
 **Hardware Design**: Abdoellah El Makkaoui  
-**Chemical Simulator/Web/Database**: Frida Tirari
+**Acoustic Simulator/Web/Database**: Frida Tirari
 
 **Contact**: tommasovaninetti8@gmail.com, abdoellah.elmakkaoui@gmail.com, fridatirari@gmail.com
 
