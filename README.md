@@ -239,7 +239,7 @@ Icons: **Uicons** by [Flaticon](https://www.flaticon.com/uicons) — open-source
 
 **Software & Firmware**: Tommaso Vaninetti  
 **Hardware Design**: Abdoellah El Makkaoui  
-**Web/Database**: Frida Tirari
+**Chemical Simulator/Web/Database**: Frida Tirari
 
 **Contact**: tommasovaninetti8@gmail.com, abdoellah.elmakkaoui@gmail.com, fridatirari@gmail.com
 
