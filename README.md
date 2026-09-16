@@ -18,7 +18,7 @@ PlantLeaf bridges the gap between rigorous scientific analysis and accessible to
 - **Real-Time Acquisition**: live FFT spectrum visualization at 390.625 FPS for audio and up to 1 kHz sampling for bioelectric signals
 - **Machine Learning Pipeline**: SVM classifier (v6) trained on hand-crafted acoustic features for high-recall click detection, with every gate threshold quoted against its measured cost in confirmed clicks
 - **Advanced Analysis Tools**: phase-preserving FFT, inverse FFT reconstruction, microphone normalization, automatic curve fitting for voltage signals
-- **Click Simulator**: physical modeling of xylem cavitation clicks, comparing two independent acoustic models (free-bubble resonance and xylem-vessel resonance)
+- **Acoustic Simulator**: physical modeling of xylem cavitation clicks, comparing two independent acoustic models (free-bubble resonance and xylem-vessel resonance)
 
 ### Scientific Capabilities
 
@@ -36,7 +36,7 @@ PlantLeaf bridges the gap between rigorous scientific analysis and accessible to
 This repository focuses on:
 - **software and firmware** developed by **Tommaso Vaninetti**
 - **hardware** developed by **Abdoellah El Makkaoui**
-- **Click Simulator** developed by **Frida Tirari**
+- **Acoustic Simulator** developed by **Frida Tirari**
 
 ---
 
@@ -79,7 +79,7 @@ For the full algorithm specification, feature definitions, training protocol, an
 
 ---
 
-### Click Simulator — Physical Modeling of Cavitation Clicks
+### Acoustic Simulator — Physical Modeling of Cavitation Clicks
 
 Beyond detecting clicks, PlantLeaf models the physics behind them. Two independent
 acoustic models are calibrated on every real click and compared using the same
@@ -188,7 +188,7 @@ Extracts 7 parameters across the depolarization and repolarization phases.
 ### User Guides
 - **[ACQUISITION_FEATURES.md](App/ACQUISITION_FEATURES.md)**: complete guide to real-time acquisition modes
 - **[ANALYSIS_FEATURES.md](App/ANALYSIS_FEATURES.md)**: advanced analysis tools and workflows
-- **[CLICK_SIMULATOR.md]**: physical modeling and comparison of the two cavitation click models
+- **[ACOUSTIC_SIMULATOR.md]**: physical modeling and comparison of the two cavitation click models
 
 ### Technical Specifications
 - **[FFT_PHASE_TECHNICAL_SPECIFICATION.md](App/FFT_PHASE_TECHNICAL_SPECIFICATION.md)**: mathematical foundation of FFT/iFFT processing
