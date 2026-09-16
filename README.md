@@ -18,6 +18,7 @@ PlantLeaf bridges the gap between rigorous scientific analysis and accessible to
 - **Real-Time Acquisition**: live FFT spectrum visualization at 390.625 FPS for audio and up to 1 kHz sampling for bioelectric signals
 - **Machine Learning Pipeline**: SVM classifier (v6) trained on hand-crafted acoustic features for high-recall click detection, with every gate threshold quoted against its measured cost in confirmed clicks
 - **Advanced Analysis Tools**: phase-preserving FFT, inverse FFT reconstruction, microphone normalization, automatic curve fitting for voltage signals
+- **Click Simulator**: physical modeling of xylem cavitation clicks, comparing two independent acoustic models (free-bubble resonance and xylem-vessel resonance)
 
 ### Scientific Capabilities
 
@@ -35,6 +36,7 @@ PlantLeaf bridges the gap between rigorous scientific analysis and accessible to
 This repository focuses on:
 - **software and firmware** developed by **Tommaso Vaninetti**
 - **hardware** developed by **Abdoellah El Makkaoui**
+- **Click Simulator** developed by **Frida Tirari**
 
 ---
 
@@ -74,6 +76,29 @@ The SVM (scikit-learn `Pipeline`: `SimpleImputer(median) → PowerTransformer(ye
 Every Stage 2 threshold is quoted in the specification with the measured percentage of confirmed clicks it costs — the v6 rule removes 83.6 % of noise for a measured 0.0 % of clicks, where the v5 rule it replaced cost 12.2 %.
 
 For the full algorithm specification, feature definitions, training protocol, and evaluation results, see [CLICK_DETECTION_ALGORITHM_v6.md](App/Automatic_click_detection_algorithm/CLICK_DETECTION_ALGORITHM_v6.md).
+
+---
+
+### Click Simulator — Physical Modeling of Cavitation Clicks
+
+Beyond detecting clicks, PlantLeaf models the physics behind them. Two independent
+acoustic models are calibrated on every real click and compared using the same
+measurement chain (firmware frame emulation, reconstruction, v6 feature extraction),
+so simulated and real signals are measured with an identical yardstick:
+
+| Model | Physical hypothesis | Free parameter |
+|---|---|---|
+| Free bubble (Minnaert + Prosperetti) | A cavitation bubble oscillating freely in water; frequency and decay time are predicted from R₀ alone, with acoustic radiation, viscous, and thermal damping | R₀ (bubble radius) |
+| Xylem vessel resonance (Dutta et al. 2022) | The xylem vessel itself resonates like an elastic-walled organ pipe; vessel radius and length are derived from the calibrated click | f, τ (calibrated) |
+
+The comparison yields biologically interpretable outputs — bubble radius, vessel
+radius and length, waveform R², and a diagnostic ratio between the vessel-calibrated
+τ and the free-bubble-predicted τ — usable to infer which physical mechanism best
+explains a given click, and to estimate xylem water tension (P∞) from systematic
+τ distributions.
+
+For the full model derivation, calibration procedure, and declared simplifications,
+see CLICK_SIMULATOR.md.
 
 ---
 
@@ -163,6 +188,7 @@ Extracts 7 parameters across the depolarization and repolarization phases.
 ### User Guides
 - **[ACQUISITION_FEATURES.md](App/ACQUISITION_FEATURES.md)**: complete guide to real-time acquisition modes
 - **[ANALYSIS_FEATURES.md](App/ANALYSIS_FEATURES.md)**: advanced analysis tools and workflows
+- **[CLICK_SIMULATOR.md]**: physical modeling and comparison of the two cavitation click models
 
 ### Technical Specifications
 - **[FFT_PHASE_TECHNICAL_SPECIFICATION.md](App/FFT_PHASE_TECHNICAL_SPECIFICATION.md)**: mathematical foundation of FFT/iFFT processing
