@@ -1,4 +1,4 @@
-# PlantLeaf Chemical-Acoustic Simulator
+# PlantLeaf Acoustic Simulator
 
  ## Physical Modeling of Xylem Embolism and Comparison with Real Ultrasonic Clicks
 
