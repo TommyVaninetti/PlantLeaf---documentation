@@ -248,7 +248,7 @@ Icons: **Uicons** by [Flaticon](https://www.flaticon.com/uicons) — open-source
 ## Competitions and Recognition
 
 - **FAST i Giovani e le Scienze 2026** — Italian Finals 1st place overall
-- **EUCYS — European Union Contest for Young Scientists 2026** — final in September 2026
+- **EUCYS — European Union Contest for Young Scientists 2026** — First Prize; awarded funded participation to ISEF 2027 as a special prize
 
 ---
 
