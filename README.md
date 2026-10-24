@@ -1,4 +1,4 @@
-# PlantLeaf Desktop Application
+# PlantLeaf - technical documentation
 
 [![Version](https://img.shields.io/badge/version-1.0.0--beta-blue.svg)](https://github.com/TommyVaninetti/PlantLeaf-Desktop-App)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
